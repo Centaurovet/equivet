@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="EquiVet"/>
+  <meta name="theme-color" content="#0a0e1a"/>
+  <link rel="manifest" href="manifest-clinica.json"/>
+  <title>EquiVet — Medicina Equina</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+    body{background:#0a0e1a;font-family:Georgia,serif;color:#e8e0d0;min-height:100vh;display:flex;flex-direction:column;}
+    .hero{padding:48px 24px 32px;text-align:center;}
+    .hero-icon{font-size:64px;display:block;margin-bottom:16px;}
+    .hero h1{font-size:28px;color:#d4a96a;letter-spacing:0.04em;margin-bottom:6px;}
+    .hero p{font-size:13px;color:#5a6a7a;letter-spacing:0.1em;text-transform:uppercase;}
+    .divider{width:48px;height:2px;background:linear-gradient(90deg,transparent,#d4a96a,transparent);margin:28px auto;}
+    .apps{padding:0 20px 40px;display:flex;flex-direction:column;gap:16px;max-width:480px;margin:0 auto;width:100%;}
+    .app-card{background:#131828;border-radius:16px;padding:24px;display:flex;align-items:center;gap:18px;text-decoration:none;color:inherit;border:1px solid #1e2a40;transition:all 0.18s;position:relative;overflow:hidden;}
+    .app-card::before{content:"";position:absolute;inset:0;opacity:0;transition:opacity 0.18s;}
+    .app-card.clinica::before{background:linear-gradient(135deg,#d4a96a08,transparent);}
+    .app-card.uti::before{background:linear-gradient(135deg,#e0555508,transparent);}
+    .app-card:active::before{opacity:1;}
+    .app-card:active{transform:scale(0.98);}
+    .app-icon{font-size:44px;flex-shrink:0;line-height:1;}
+    .app-info{flex:1;}
+    .app-name{font-size:18px;font-weight:700;margin-bottom:4px;}
+    .app-name.clinica{color:#d4a96a;}
+    .app-name.uti{color:#e05555;}
+    .app-desc{font-size:12px;color:#5a6a7a;line-height:1.5;}
+    .app-arrow{font-size:20px;color:#2a3a50;flex-shrink:0;}
+    .app-tag{position:absolute;top:12px;right:12px;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:2px 7px;border-radius:10px;}
+    .tag-clinica{background:#d4a96a18;color:#d4a96a;border:1px solid #d4a96a44;}
+    .tag-uti{background:#e0555518;color:#e05555;border:1px solid #e0555544;}
+    .install-hint{margin:0 20px 32px;background:#131828;border:1px solid #1e2a40;border-radius:12px;padding:16px;max-width:480px;margin-left:auto;margin-right:auto;}
+    .install-hint h3{font-size:13px;color:#d4a96a;margin-bottom:10px;letter-spacing:0.04em;}
+    .install-step{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;}
+    .step-num{width:20px;height:20px;background:#d4a96a22;border:1px solid #d4a96a55;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#d4a96a;flex-shrink:0;margin-top:1px;}
+    .install-step p{font-size:12px;color:#7a8a9a;line-height:1.5;}
+    .install-step strong{color:#c8b898;}
+    .footer{text-align:center;padding:16px;font-size:11px;color:#2a3a50;margin-top:auto;}
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <span class="hero-icon">🐎</span>
+  <h1>EquiVet</h1>
+  <p>Medicina Equina — Dr. Ricardo</p>
+</div>
+
+<div class="divider"></div>
+
+<div class="apps">
+  <a href="equivet-clinica.html" class="app-card clinica">
+    <div class="app-tag tag-clinica">Clínica</div>
+    <div class="app-icon">📋</div>
+    <div class="app-info">
+      <div class="app-name clinica">EquiVet Clínica</div>
+      <div class="app-desc">Prescrições prontas, diagnósticos personalizados e cobrança por atendimento</div>
+    </div>
+    <div class="app-arrow">›</div>
+  </a>
+
+  <a href="equivet-uti.html" class="app-card uti">
+    <div class="app-tag tag-uti">UTI</div>
+    <div class="app-icon">🏇</div>
+    <div class="app-info">
+      <div class="app-name uti">EquiVet UTI</div>
+      <div class="app-desc">Protocolo pré e pós-operatório de cólica cirúrgica com escores de monitoramento</div>
+    </div>
+    <div class="app-arrow">›</div>
+  </a>
+</div>
+
+<div class="install-hint">
+  <h3>📲 Adicionar à tela inicial</h3>
+  <div class="install-step">
+    <div class="step-num">1</div>
+    <p><strong>iPhone:</strong> toque em compartilhar (⬆) no Safari → "Adicionar à Tela de Início"</p>
+  </div>
+  <div class="install-step">
+    <div class="step-num">2</div>
+    <p><strong>Android:</strong> toque nos três pontos (⋮) no Chrome → "Adicionar à tela inicial"</p>
+  </div>
+  <div class="install-step">
+    <div class="step-num">3</div>
+    <p>O app abre em <strong>tela cheia</strong>, sem barra do navegador, e funciona <strong>offline</strong></p>
+  </div>
+</div>
+
+<div class="footer">EquiVet v1.0 — dados salvos localmente no dispositivo</div>
+
+<script>
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('SW registrado:', r.scope))
+      .catch(e => console.log('SW erro:', e));
+  }
+</script>
+</body>
+</html>

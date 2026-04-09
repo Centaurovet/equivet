@@ -1,0 +1,13 @@
+{
+  "name": "EquiVet UTI",
+  "short_name": "EquiVet UTI",
+  "description": "Protocolo pre e pos-operatorio de colica cirurgica equina",
+  "start_url": "./equivet-uti.html",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-uti.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

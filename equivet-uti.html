@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="EquiVet UTI"/>
+  <meta name="theme-color" content="#0a0e1a"/>
+  <link rel="manifest" href="manifest-uti.json"/>
+  <title>EquiVet UTI - Colica Cirurgica</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0;}
+    body{background:#0a0e1a;font-family:Georgia,serif;color:#e8e0d0;}
+    input,textarea,select,button{font-family:Georgia,serif;}
+    input:focus,textarea:focus,select:focus{outline:2px solid #e05555;outline-offset:1px;}
+    ::-webkit-scrollbar{width:3px;}
+    ::-webkit-scrollbar-thumb{background:#2a3040;border-radius:2px;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const {useState,useEffect,useRef} = React;
+
+// ─── CORES ────────────────────────────────────────────────────────────────────
+const C = {
+  bg:"#0a0e1a", card:"#131828", bord:"#1e2a40",
+  red:"#e05555", redDark:"#8b2020", redSoft:"#2a1515",
+  amber:"#d4a96a", amberDark:"#7a5a20", amberSoft:"#2a1e0a",
+  green:"#4abf69", greenSoft:"#0e2a1a",
+  blue:"#5a9abf", blueSoft:"#0e1e2a",
+  muted:"#6a7a9a", text:"#e8e0d0", dim:"#4a5a7a"
+};
+
+const IS = {background:C.card,border:"1px solid "+C.bord,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:13,outline:"none",boxSizing:"border-box",width:"100%"};
+
+// ─── DADOS: PROTOCOLOS ────────────────────────────────────────────────────────
+
+const PROTOCOLOS = {
+  campo: {
+    titulo: "Atendimento em Campo",
+    subtitulo: "Estabilizacao pre-transporte",
+    icon: "🚨",
+    cor: C.red,
+    diagnosticos: ["Deslocamento de Colon","Hernia Estrangulada / Encarceramento de Delgado","Indefinido - Colica Cirurgica"],
+    protocolos: [
+      {
+        nome: "Analgesia de Emergencia",
+        passos: [
+          "Flunixina meglumina 50 mg/mL — 1,1 mg/kg IV lento (max 500 mg)\nATENCAO: nao mascarar dor apos administracao, reavaliar em 20 min",
+          "Dipirona sodica 50% — 25-30 mL IV lento (cavalos 400-500 kg)\nPode ser associada a flunixina",
+          "Butilescopolamina (Buscopan) — 20 mL IV\nSo em colica espamodica confirmada — CONTRAINDICADO em suspeita cirurgica de obstrucao",
+          "SE DOR REFRATARIA: Xilazina 10% — 0,5-1,0 mg/kg IV\nMonitorar depressao respiratoria e hipotensao"
+        ]
+      },
+      {
+        nome: "Fluidoterapia de Emergencia",
+        passos: [
+          "Acesso venoso jugular bilateral com cateter 14G\nFixar bem — transporte vai deslocar",
+          "Ringer Lactato — 10-20 mL/kg/h na primeira hora (cavalo 450 kg = 4,5-9 L/h)\nMeta: restaurar perfusao antes do transporte",
+          "Se hipotensao severa (mucosas palidas, TRC > 3s):\nNaCl 7,2% (hipertonico) — 4 mL/kg IV em 10 min = aprox 1,8 L para 450 kg\nSeguir imediatamente com Ringer Lactato",
+          "Plasma fresco (se disponivel) — 2-4 L IV\nIndicado em suspeita de endotoxemia grave"
+        ]
+      },
+      {
+        nome: "Sondagem Nasogastrica",
+        passos: [
+          "OBRIGATORIA em todo caso de colica antes do transporte\nAlivio de refluxo previne ruptura gastrica durante transporte",
+          "Introduzir sonda 14-16 mm, avanco cuidadoso ate estomago\nConfirmar posicao pelo odor e aspiracao",
+          "Sifonar e medir volume de refluxo\n< 2 L: normal / 2-5 L: moderado / > 5 L: critico (provavel obstrucao de ID)",
+          "SE REFLUXO > 5 L: manter sonda aberta durante transporte com funil\nNAO administrar fluidoterapia oral — risco de aspiracao",
+          "Registrar: cor do refluxo (liquido gastrico normal = amarelo-esverdeado / marrom fedorento = obstrucao intestinal)"
+        ]
+      },
+      {
+        nome: "Preparacao para Transporte",
+        passos: [
+          "NUNCA transportar sem analgesia adequada — dor intensa causa quedas no trailer",
+          "Manter acesso venoso patente — continuidade da fluidoterapia no trajeto",
+          "Bandagem de cauda e membros posteriores\nProteger jarretes e boletos de traumatismos",
+          "Avisar clinica de destino: diagnostico suspeito, tempo estimado, estado hemodinamico\nPermite preparo de sala cirurgica antecipado",
+          "Posicionar cavalo de pe ou em decubito lateral direito no trailer\nDecubito lateral esquerdo comprime ceco — evitar",
+          "Velocidade maxima: 60 km/h — curvas suaves\nAcompanhante no trailer se estado critico"
+        ]
+      }
+    ]
+  },
+
+  preop: {
+    titulo: "Pre-Operatorio",
+    subtitulo: "Clinica - preparo cirurgico",
+    icon: "🏥",
+    cor: C.amber,
+    diagnosticos: ["Deslocamento de Colon","Hernia Estrangulada / Encarceramento de Delgado"],
+    protocolos: [
+      {
+        nome: "Avaliacao Clinica Rapida",
+        passos: [
+          "FC (normal: 28-44 bpm) — taquicardia > 60 bpm indica comprometimento grave\nAferir no ingresso e a cada 30 min",
+          "FR (normal: 8-16 rpm) — taquipneia indica dor intensa ou comprometimento toracico",
+          "TRC (normal: < 2 s) — TRC 2-3 s: comprometimento / > 3 s: choque",
+          "Mucosas: rosadas (normal) / palidas (hipovolemia) / congestionadas (endotoxemia) / cianoticas (choque)",
+          "Auscultacao: 4 quadrantes — ausencia de motilidade em todos = paralisia intestinal\nMotilidade aumentada unilateral = obstrucao proximal",
+          "Palpacao retal: distensao de alças, tensao mesenterica, posicao do colon\nREGISTRAR achados para comparativo pos-cirurgia"
+        ]
+      },
+      {
+        nome: "Protocolo de Fluidos Pre-op",
+        passos: [
+          "Meta antes da anestesia: PAS > 90 mmHg, FC < 60 bpm, TRC < 2s, diurese > 1 mL/kg/h",
+          "Ringer Lactato — 10-20 mL/kg/h ate estabilizacao hemodinamica\nCavalo 450 kg = bolus de 4,5-9 L na 1a hora",
+          "NaCl 0,9% — alternar com Ringer se acidose metabolica suspeita\nEvitar excesso de Lactato em hepatopatia",
+          "Plasma equino — 2-6 L IV se PT < 4,5 g/dL ou endotoxemia evidente\nProteina total: meta > 5,0 g/dL pre-cirurgia",
+          "Dobutamina 5-10 mcg/kg/min IV continuo se hipotensao refrataria a fluidos\nPreparo: 250 mg em 500 mL SG 5% = 0,5 mg/mL"
+        ]
+      },
+      {
+        nome: "Medicacao Pre-Anestesica",
+        passos: [
+          "Xilazina 10% — 1,0-1,1 mg/kg IV (sedacao pre-anestesica)\nAguardar 3-5 min para efeito completo antes da inducao",
+          "Butorfanol — 0,02-0,04 mg/kg IV junto com xilazina\nMelhora analgesia e qualidade da sedacao",
+          "Guaifenesina 5% (GGE) — 50-100 mg/kg IV ate relaxamento muscular\nAproximadamente 50-100 mL/min ate decubito — manter veia patente",
+          "Ketamina 10% — 2,2 mg/kg IV em bolus para inducao\nAplicar apos GGE produzir ataxia marcada",
+          "Intubacao orotraqueal imediata apos decubito\nTubo 26-30 mm — insuflar cuff, confirmar capnografia"
+        ]
+      },
+      {
+        nome: "Antibioticoterapia Profilatica",
+        passos: [
+          "Penicilina G Sodica — 22.000 UI/kg IV, 30-60 min antes da incisao\nCavalo 450 kg = aprox. 10.000.000 UI",
+          "Gentamicina 10% — 6,6 mg/kg IV lento (diluir em 500 mL SF), dose unica pre-op\nHIDRATACAO ADEQUADA OBRIGATORIA — nefrotoxica em hipovolemia",
+          "Metronidazol — 15 mg/kg IV lento (diluir em 500 mL SF), para anaerobiose\nIndicado em hernias estranguladas com necrose suspeita",
+          "Manter penicilina a cada 6h no pos-operatorio por 5-7 dias\nGentamicina: 1x/dia com hidratacao adequada"
+        ]
+      },
+      {
+        nome: "Deslocamento de Colon - Especifico",
+        passos: [
+          "Distensao de colon maior ao exame retal: confirmar lado do deslocamento\nEsquerdo (nefroespecnico) vs. Direito (retroesplecnico/umbilical)",
+          "Rolagem controlada: considerar antes da cirurgia em deslocamentos simples sem volvulo\nRequere anestesia geral — posicionar em decubito dorsal, rotacao lateral sistematica",
+          "Criterios para cirurgia imediata: dor refrataria, FC > 60, refluxo > 8 L, distensao progressiva, volvulo suspeito",
+          "Pre-op especifico: esvaziar colon via sondagem — reduz distensao intra-operatoria\nLavagem colon: 5-10 L agua morna via sonda, sifonar"
+        ]
+      },
+      {
+        nome: "Hernia Estrangulada - Especifico",
+        passos: [
+          "URGENCIA MAXIMA — cada hora de isquemia aumenta mortalidade em 10-15%\nMeta: cirurgia em < 2h do diagnostico confirmado",
+          "Sinais de gravidade: FC > 80, mucosas congestionadas/toxicas, dor intensa refrataria, refluxo marrom fetido > 8 L",
+          "NAO tentar reducao manual da hernia sem anestesia\nRisco de ruptura intestinal e contaminacao peritoneal",
+          "Pre-hidratacao agressiva: Ringer Lactato 20 mL/kg/h + NaCl 7,2% 4 mL/kg se choque\nMeta: TRC < 3s e mucosas rosa antes de anestesiar",
+          "Plasma 4-6 L IV se disponivel — protege contra endotoxemia pos-reducao\nLiberacao de toxinas na circulacao ao restaurar perfusao do intestino isquemico"
+        ]
+      }
+    ]
+  },
+
+  posop: {
+    titulo: "Pos-Operatorio Imediato",
+    subtitulo: "Primeiras 24-72 horas",
+    icon: "⚡",
+    cor: C.blue,
+    diagnosticos: ["Deslocamento de Colon","Hernia Estrangulada / Encarceramento de Delgado"],
+    protocolos: [
+      {
+        nome: "Recuperacao Anestesica",
+        passos: [
+          "BOX DE RECUPERACAO: cama funda (palha 30 cm), sem obstaculos, acolchoado nas paredes se possivel",
+          "Extubacao: manter tubo ate deglutir espontaneamente\nNao forcuar extubacao prematura — risco de broncoaspiracao",
+          "Xilazina 0,2-0,3 mg/kg IV se agitacao na recuperacao\nRecuperacao suave reduz risco de miopatia pos-anestesica",
+          "Tempo medio de recuperacao: 30-60 min\nFicar presente — auxiliar ao levantar com roldana ou cordas na cauda",
+          "Primeira avaliacao completa apos o cavalo estabilizar em estacao:\nFC, FR, TRC, mucosas, temperatura, auscultacao abdominal"
+        ]
+      },
+      {
+        nome: "Fluidoterapia Pos-op",
+        passos: [
+          "Ringer Lactato — 2-4 mL/kg/h nas primeiras 12-24h\nCavalo 450 kg = 0,9-1,8 L/h (22-43 L/dia)",
+          "Meta de diurese: > 1 mL/kg/h = 450 mL/h minimo\nMonitorar producao urinaria — sonda uretral se necessario",
+          "KCl 10% — 20-40 mEq/L no fluido se hipocalemia (K < 3,0 mEq/L)\nHipocalemia e comum pos-op e agrava ileus",
+          "CaCl2 10% — 0,1-0,2 mL/kg diluido em fluido se hipocalcemia\nNecessaria para motilidade intestinal normal",
+          "Descontinuar fluidos IV progressivamente apos retorno da motilidade e ingesta oral (24-72h)"
+        ]
+      },
+      {
+        nome: "Analgesia Pos-op",
+        passos: [
+          "Flunixina meglumina — 0,5-1,1 mg/kg IV a cada 12h\nDose baixa (0,5 mg/kg) preferivel para preservar motilidade intestinal",
+          "Dipirona — 20-25 mL IV a cada 8h como adjuvante\nMenor impacto na motilidade que AINEs",
+          "Lidocaina IV continua — 1,3 mg/kg bolus lento, seguido 3 mg/kg/h\nPRINCIPAL agente anti-ileus — manter 24-48h pos-op em cirurgias de ID",
+          "Butorfanol — 0,02-0,04 mg/kg IV a cada 4-6h se dor moderada a intensa\nNao mascar avaliacao de dor — registrar antes de cada dose",
+          "AINE via oral (Fenilbutazona 2g/dia) ao retornar ingesta — transicao de IV para VO"
+        ]
+      },
+      {
+        nome: "Monitoramento Pos-op",
+        passos: [
+          "FREQUENCIA: a cada 1-2h nas primeiras 12h, a cada 4h nas proximas 12-24h",
+          "FC: meta < 48 bpm — taquicardia persistente indica dor, complicacao ou endotoxemia",
+          "Auscultacao: 4 quadrantes — retorno de motilidade esperado em 6-24h para intestino grosso, 12-48h para delgado",
+          "Sondagem nasogastrica a cada 4-6h nas primeiras 24h\nRefluxo > 2 L = ileus pos-op — manter sonda aberta",
+          "Fezes: primeira evacuacao esperada em 12-24h para cirurgias de colon, 24-48h para delgado\nAusencia apos 48h indica ileus prolongado",
+          "Temperatura retal: meta 37,5-38,5 C — febre > 39 C apos 24h investiga complicacao infecciosa"
+        ]
+      },
+      {
+        nome: "Antibioticos Pos-op",
+        passos: [
+          "Penicilina G Procaina 300.000 UI/mL — 22.000 UI/kg IM a cada 12h por 5-7 dias\nTrocar para oral (Trimetropim-Sulfa) apos retorno da ingesta",
+          "Gentamicina — 6,6 mg/kg IV 1x/dia com fluidoterapia adequada por 3-5 dias\nMonitorar funcao renal: ureia e creatinina D2 e D5",
+          "Metronidazol — 15 mg/kg IV ou 25 mg/kg VO a cada 12h por 5 dias\nManter em hernias com resseccao intestinal",
+          "Omeprazol — 4 mg/kg VO 1x/dia (inicio assim que retornar ingesta)\nPrevencao de ulcera gastrica pos-op — manter 30 dias"
+        ]
+      },
+      {
+        nome: "Cuidados com Ferida Cirurgica",
+        passos: [
+          "Curativo compressivo abdominal: trocar a cada 24-48h ou se sujo\nMaterial: gaze vaselinada + coxim de algodao + atadura elastica",
+          "Inspecionar linha de sutura a cada curativo:\nEdema leve = normal / Edema firme + calor = celulite / Secrecao purulenta = infeccao",
+          "Protrusion de epiplon ou intestino pela ferida: emergencia — cobrir com compressa umida, chamar cirurgiao",
+          "Suporte abdominal: cinta elastica por 2-3 semanas em animais com boa recuperacao\nReduz tensao na sutura e edema pos-op"
+        ]
+      }
+    ]
+  },
+
+  alta: {
+    titulo: "Pos-Alta e Recuperacao",
+    subtitulo: "Semanas 1 a 8",
+    icon: "🌿",
+    cor: C.green,
+    diagnosticos: ["Deslocamento de Colon","Hernia Estrangulada / Encarceramento de Delgado","Geral"],
+    protocolos: [
+      {
+        nome: "Criterios de Alta Hospitalar",
+        passos: [
+          "FC < 44 bpm em repouso por > 12h consecutivas",
+          "Motilidade intestinal presente em todos os quadrantes",
+          "Ingesta voluntaria de feno por > 12h sem refluxo",
+          "Producao de fezes normal em quantidade e consistencia",
+          "Ferida cirurgica limpa, sem secrecao, sem deiscencia",
+          "Temperatura < 38,5 C nas ultimas 24h sem antipireticos",
+          "Proprietario capaz e orientado para cuidados em casa"
+        ]
+      },
+      {
+        nome: "Medicacao Pos-Alta",
+        passos: [
+          "Fenilbutazona 1g/comprimido — 2,2-4,4 mg/kg VO 1x/dia por 5-7 dias\nCom omeprazol obrigatoriamente",
+          "Omeprazol equino — 4 mg/kg VO 1x/dia por 30 dias\nRisco de ulcera gastrica e alto no periodo pos-operatorio",
+          "Trimetropim-Sulfa — 30 mg/kg VO a cada 12h por 7-10 dias\nSe necessario continuar antibioticoterapia em casa",
+          "Vitamina E + Selenio — 1 ampola IM na alta\nApoio muscular e antioxidante no periodo de recuperacao",
+          "Pro-biotico equino — 1 sache VO 1x/dia por 14-21 dias\nRestabelecimento da microbiota apos antibioticos e jejum"
+        ]
+      },
+      {
+        nome: "Manejo Alimentar Pos-Alta",
+        passos: [
+          "SEMANA 1-2: feno de boa qualidade a vontade, sem concentrado\nFeno de timothy ou coast cross — baixo amido, alta fibra",
+          "SEMANA 3-4: reintroduzir concentrado gradualmente\nInicio com 500g/dia, aumentar 200g a cada 2 dias ate nivel pre-cirurgia",
+          "EVITAR: pastagem verde exuberante nas primeiras 4 semanas\nFermentacao rapida aumenta gas e risco de recorrencia",
+          "AGUA: monitorar consumo — reducao indica dor ou febre\nMeta > 30 L/dia em clima quente para cavalo 450 kg",
+          "ELETROLITROS: oferecer sal mineral livre nas primeiras 2 semanas\nRepoe perdas do periodo hospitalar"
+        ]
+      },
+      {
+        nome: "Repouso e Retorno ao Exercicio",
+        passos: [
+          "SEMANA 1-4: repouso absoluto em baia grande (6x6 m minimo)\nMovimento livre mas sem galope ou salto",
+          "SEMANA 4-6: passo a mao, 15-20 min/dia\nAvaliar ferida e condicao geral antes de cada sessao",
+          "SEMANA 6-8: longear em passo e trote leve\nSE ferida totalmente cicatrizada e sem sinais de aderencia",
+          "APOS 8 SEMANAS: retorno gradual ao trabalho normal\nRecomendado exame de motilidade e avaliacao clinica pre-retorno",
+          "HERNIAS ESTRANGULADAS COM RESSECCAO: adicionar 2-4 semanas em cada fase\nCicatrizacao intestinal e abdominal mais lenta"
+        ]
+      },
+      {
+        nome: "Retornos e Monitoramento",
+        passos: [
+          "RETORNO 1: 7-10 dias — remocao de pontos, avaliacao da ferida, hemograma\nEcografia abdominal se suspeita de aderencias",
+          "RETORNO 2: 30 dias — avaliacao clinica completa, reintroducao ao trabalho\nDosagem de proteinas totais, albumina, fibrinogenio",
+          "RETORNO 3: 60 dias — avaliacao final, liberacao para esporte se aplicavel",
+          "SINAIS DE ALERTA para retorno imediato:\n- Colicar novamente (aderencias, ileus recorrente)\n- Febre > 39 C\n- Edema abdominal crescente\n- Deiscencia da ferida\n- Parada de fezes apos alta"
+        ]
+      },
+      {
+        nome: "Prevencao de Recorrencia",
+        passos: [
+          "MANEJO ALIMENTAR: fracionar refeicoes (3-4x/dia em vez de 1-2x)\nPrincipal fator de risco modificavel para colica",
+          "HIDRATACAO: acesso continuo a agua limpa e fresca\nDesidratacao cronica e fator de risco para deslocamento de colon",
+          "ANTIPARASITARIO: coprocultura e contagem de OPG antes de vermifugar\nEvitar estrongilose e parasitismo como gatilho de colica",
+          "EXERCICIO REGULAR: trabalho diario previne estase intestinal\nCavalos confinados tem 4x mais risco de colica",
+          "VACINACAO: manter calendario atualizado — rotavirus e outros agentes entericos\nRegistrar todo episodio de colica para identificar padroes"
+        ]
+      }
+    ]
+  }
+};
+
+// ─── ESCORES ──────────────────────────────────────────────────────────────────
+
+const ESCORES_CONFIG = [
+  {
+    id:"dor", nome:"Escore de Dor (0-4)", descricao:"Grimace Scale / comportamento",
+    opcoes:[
+      {val:0, label:"0 - Sem dor", desc:"Normal, alerta, apetite presente", cor:C.green},
+      {val:1, label:"1 - Dor leve", desc:"Olha para o flanco, inquieto, reduz apetite", cor:"#8abf40"},
+      {val:2, label:"2 - Dor moderada", desc:"Raspa o solo, deita e levanta, suor leve", cor:C.amber},
+      {val:3, label:"3 - Dor intensa", desc:"Deita forcosamente, rola, suor intenso", cor:"#d47a20"},
+      {val:4, label:"4 - Dor severa", desc:"Incontrolavel, risco de lesao, nao responde", cor:C.red},
+    ]
+  },
+  {
+    id:"mucosa", nome:"Mucosas", descricao:"Cor e umidade",
+    opcoes:[
+      {val:0, label:"Rosadas umidas", desc:"Normal", cor:C.green},
+      {val:1, label:"Rosadas secas", desc:"Desidratacao leve", cor:"#8abf40"},
+      {val:2, label:"Palidas", desc:"Hipovolemia / anemia", cor:C.amber},
+      {val:3, label:"Congestionadas", desc:"Endotoxemia / sepse", cor:"#d47a20"},
+      {val:4, label:"Cianoticas / toxicas", desc:"Choque — emergencia", cor:C.red},
+    ]
+  },
+  {
+    id:"trc", nome:"TRC (Tempo de Rec. Capilar)", descricao:"Pressionar gengiva por 2s",
+    opcoes:[
+      {val:0, label:"< 1,5s", desc:"Normal", cor:C.green},
+      {val:1, label:"1,5 - 2s", desc:"Limite superior do normal", cor:"#8abf40"},
+      {val:2, label:"2 - 3s", desc:"Comprometimento moderado", cor:C.amber},
+      {val:3, label:"3 - 4s", desc:"Comprometimento grave", cor:"#d47a20"},
+      {val:4, label:"> 4s", desc:"Choque — emergencia", cor:C.red},
+    ]
+  },
+  {
+    id:"motilidade", nome:"Motilidade Intestinal", descricao:"Auscultacao 4 quadrantes",
+    opcoes:[
+      {val:0, label:"Normal (4/4)", desc:"Sons borbulhantes regulares em todos", cor:C.green},
+      {val:1, label:"Reduzida (3/4)", desc:"Ausente em 1 quadrante", cor:"#8abf40"},
+      {val:2, label:"Reduzida (2/4)", desc:"Presente em apenas 2 quadrantes", cor:C.amber},
+      {val:3, label:"Minima (1/4)", desc:"Som apenas em 1 quadrante", cor:"#d47a20"},
+      {val:4, label:"Ausente (0/4)", desc:"Silencio abdominal — paralisia intestinal", cor:C.red},
+    ]
+  },
+  {
+    id:"distensao", nome:"Distensao Abdominal", descricao:"Inspecao visual e palpacao",
+    opcoes:[
+      {val:0, label:"Ausente", desc:"Abdomen normal", cor:C.green},
+      {val:1, label:"Leve", desc:"Leve abaulamento em flanco direito", cor:"#8abf40"},
+      {val:2, label:"Moderada", desc:"Abaulamento bilateral visivel", cor:C.amber},
+      {val:3, label:"Acentuada", desc:"Abdomen tenso, timpanismo", cor:"#d47a20"},
+      {val:4, label:"Critica", desc:"Distensao extrema, risco de ruptura", cor:C.red},
+    ]
+  },
+  {
+    id:"refluxo", nome:"Refluxo Gastrico", descricao:"Volume obtido na sondagem nasogastrica",
+    opcoes:[
+      {val:0, label:"Ausente", desc:"Sem refluxo — estomago vazio", cor:C.green},
+      {val:1, label:"< 2 L", desc:"Volume residual leve — monitorar", cor:"#8abf40"},
+      {val:2, label:"2 - 5 L", desc:"Refluxo moderado — obstrucao proximal suspeita", cor:C.amber},
+      {val:3, label:"5 - 8 L", desc:"Refluxo intenso — obstrucao de ID provavel, manter sonda aberta", cor:"#d47a20"},
+      {val:4, label:"> 8 L / fetido", desc:"Refluxo critico ou marrom fetido — necrose intestinal / ruptura iminente", cor:C.red},
+    ]
+  },
+];
+
+function lsGet(k,fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch{ return fb; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
+const LS_AVAL = "equivet_uti_avaliacoes_v1";
+
+// ─── COMPONENTES ──────────────────────────────────────────────────────────────
+
+function Badge({cor,children}){
+  return <span style={{background:cor+"22",color:cor,border:"1px solid "+cor+"66",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:700}}>{children}</span>;
+}
+
+function Alerta({tipo,children}){
+  const cores = {danger:[C.red,"#3a0a0a"], warn:[C.amber,"#2a1e0a"], info:[C.blue,"#0a1e2a"]};
+  const [c,bg] = cores[tipo]||cores.info;
+  return <div style={{background:bg,border:"1px solid "+c+"55",borderRadius:8,padding:"10px 14px",marginBottom:10,fontSize:13,color:c,lineHeight:1.5}}>{children}</div>;
+}
+
+function EscoreWidget({escores,setEscores}){
+  const total = ESCORES_CONFIG.reduce((s,e)=>s+(escores[e.id]||0),0);
+  const maxTotal = ESCORES_CONFIG.length * 4;
+  const risco = total <= 4 ? ["Estavel",C.green] : total <= 8 ? ["Atencao",C.amber] : total <= 12 ? ["Grave",C.red] : ["Critico",C.red];
+
+  return(
+    <div>
+      {/* Total */}
+      <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:12,padding:"14px 16px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <div style={{fontSize:12,color:C.muted,marginBottom:4}}>ESCORE TOTAL</div>
+          <div style={{fontSize:28,fontWeight:700,color:risco[1]}}>{total}<span style={{fontSize:14,color:C.dim}}>/{maxTotal}</span></div>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <Badge cor={risco[1]}>{risco[0]}</Badge>
+          <div style={{fontSize:11,color:C.dim,marginTop:6}}>Atualizado agora</div>
+        </div>
+      </div>
+
+      {ESCORES_CONFIG.map(esc=>{
+        const val = escores[esc.id]||0;
+        const opcaoAtual = esc.opcoes[val];
+        return(
+          <div key={esc.id} style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div>
+                <div style={{fontSize:13,fontWeight:700,color:C.text}}>{esc.nome}</div>
+                <div style={{fontSize:11,color:C.dim}}>{esc.descricao}</div>
+              </div>
+              <Badge cor={opcaoAtual.cor}>{val}</Badge>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {esc.opcoes.map(op=>(
+                <button key={op.val} onClick={()=>setEscores({...escores,[esc.id]:op.val})} style={{
+                  background: val===op.val ? op.cor+"33" : "transparent",
+                  border:"1px solid "+(val===op.val ? op.cor : C.bord),
+                  borderRadius:8,padding:"6px 10px",cursor:"pointer",
+                  fontSize:12,color:val===op.val?op.cor:C.muted,
+                  fontWeight:val===op.val?700:400,
+                  flex:"1 1 auto",minWidth:60,textAlign:"center",
+                }}>{op.val}</button>
+              ))}
+            </div>
+            <div style={{fontSize:11,color:opcaoAtual.cor,marginTop:6,paddingLeft:2}}>
+              {opcaoAtual.label} — {opcaoAtual.desc}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Alertas automaticos */}
+      {total >= 13 && <Alerta tipo="danger">PACIENTE CRITICO — Acionar medidas de emergencia imediatas. Considerar suporte intensivo.</Alerta>}
+      {escores.trc >= 3 && <Alerta tipo="danger">TRC critico — Choque circulatorio. Fluidoterapia agressiva imediata.</Alerta>}
+      {escores.mucosa >= 3 && <Alerta tipo="danger">Mucosas toxicas — Endotoxemia grave. Plasma + fluidos + AINE urgente.</Alerta>}
+      {escores.refluxo >= 4 && <Alerta tipo="danger">Refluxo critico ({">"}8L ou fetido) — Necrose intestinal / ruptura iminente. Cirurgia de emergencia.</Alerta>}
+      {escores.refluxo === 3 && <Alerta tipo="warn">Refluxo intenso (5-8L) — Obstrucao de intestino delgado provavel. Manter sonda aberta. Avaliar indicacao cirurgica urgente.</Alerta>}
+      {escores.refluxo === 2 && <Alerta tipo="info">Refluxo moderado (2-5L) — Repetir sondagem a cada 2h. Nao administrar fluidos orais.</Alerta>}
+      {escores.motilidade >= 3 && <Alerta tipo="warn">Motilidade severamente reduzida — Ileus. Iniciar lidocaina IV continua.</Alerta>}
+      {escores.dor >= 3 && <Alerta tipo="warn">Dor intensa — Revisar analgesia. Registrar hora e resposta ao tratamento.</Alerta>}
+    </div>
+  );
+}
+
+function HistoricoWidget({historico,onSalvar,escores}){
+  const [nota,setNota] = useState("");
+  const salvar = () => {
+    const reg = {
+      hora: new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}),
+      data: new Date().toLocaleDateString("pt-BR"),
+      escores:{...escores},
+      total: ESCORES_CONFIG.reduce((s,e)=>s+(escores[e.id]||0),0),
+      nota: nota.trim()
+    };
+    onSalvar(reg);
+    setNota("");
+  };
+
+  return(
+    <div>
+      <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:"12px 14px",marginBottom:12}}>
+        <div style={{fontSize:12,color:C.muted,marginBottom:6}}>Observacao (opcional)</div>
+        <textarea value={nota} onChange={e=>setNota(e.target.value)} placeholder="Ex: refluxo 3L, inicio lidocaina, primeira evacuacao..." style={{...IS,minHeight:60,resize:"none",fontSize:13}}/>
+        <button onClick={salvar} style={{background:C.red,color:"#fff",border:"none",borderRadius:8,padding:"9px",cursor:"pointer",fontSize:13,fontWeight:700,width:"100%",marginTop:8}}>
+          Registrar avaliacao agora
+        </button>
+      </div>
+
+      {historico.length===0 && <div style={{color:C.dim,fontSize:13,padding:"12px 0"}}>Nenhuma avaliacao registrada ainda.</div>}
+      {[...historico].reverse().map((r,i)=>{
+        const risco = r.total<=4?"Estavel":r.total<=8?"Atencao":r.total<=12?"Grave":"Critico";
+        const cor = r.total<=4?C.green:r.total<=8?C.amber:C.red;
+        return(
+          <div key={i} style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:"10px 14px",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+              <div style={{fontSize:12,color:C.muted}}>{r.data} {r.hora}</div>
+              <Badge cor={cor}>{risco} ({r.total})</Badge>
+            </div>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:r.nota?6:0}}>
+              {ESCORES_CONFIG.map(e=>(
+                <span key={e.id} style={{fontSize:11,color:C.dim}}>{e.nome.split(" ")[0]}: <span style={{color:C.text,fontWeight:700}}>{r.escores[e.id]||0}</span></span>
+              ))}
+            </div>
+            {r.nota&&<div style={{fontSize:12,color:C.amber,marginTop:4,fontStyle:"italic"}}>"{r.nota}"</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProtocoloCard({protocolo}){
+  const [aberto,setAberto] = useState(false);
+  const [feitos,setFeitos] = useState({});
+  const total = protocolo.passos.length;
+  const done  = Object.values(feitos).filter(Boolean).length;
+
+  return(
+    <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:12,marginBottom:10,overflow:"hidden"}}>
+      <div onClick={()=>setAberto(!aberto)} style={{padding:"14px 16px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",touchAction:"manipulation"}}>
+        <div style={{flex:1}}>
+          <div style={{fontSize:14,fontWeight:700,color:C.text}}>{protocolo.nome}</div>
+          <div style={{fontSize:11,color:done===total&&total>0?C.green:C.dim,marginTop:3}}>
+            {done}/{total} etapas {done===total&&total>0?"concluidas":""}
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          {done>0&&<div style={{width:36,height:6,background:C.bord,borderRadius:3,overflow:"hidden"}}>
+            <div style={{width:(done/total*100)+"%",height:"100%",background:done===total?C.green:C.amber,borderRadius:3,transition:"width 0.3s"}}/>
+          </div>}
+          <span style={{color:C.muted,fontSize:18}}>{aberto?"▲":"▼"}</span>
+        </div>
+      </div>
+      {aberto&&<div style={{borderTop:"1px solid "+C.bord,padding:"4px 0 12px"}}>
+        {protocolo.passos.map((passo,i)=>{
+          const linhas = passo.split("\n");
+          const principal = linhas[0];
+          const detalhe = linhas.slice(1).join("\n");
+          const isAlert = principal.startsWith("ATENCAO")||principal.startsWith("NAO ")||principal.startsWith("URGENCIA")||principal.startsWith("OBRIGATORIO");
+          return(
+            <div key={i} onClick={()=>setFeitos({...feitos,[i]:!feitos[i]})}
+              style={{display:"flex",gap:12,padding:"10px 16px",cursor:"pointer",background:feitos[i]?"#0a1a0a":"transparent",borderLeft:"3px solid "+(feitos[i]?C.green:isAlert?C.red:"transparent"),transition:"all 0.15s",touchAction:"manipulation"}}>
+              <div style={{width:22,height:22,borderRadius:6,border:"2px solid "+(feitos[i]?C.green:C.bord),background:feitos[i]?C.green:"transparent",flexShrink:0,marginTop:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                {feitos[i]&&<span style={{color:"#0a0e1a",fontSize:14,fontWeight:900}}>✓</span>}
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,color:feitos[i]?C.dim:isAlert?C.red:C.text,textDecoration:feitos[i]?"line-through":"none",lineHeight:1.4,fontWeight:isAlert?700:400}}>
+                  {principal}
+                </div>
+                {detalhe&&!feitos[i]&&<div style={{fontSize:12,color:C.dim,marginTop:4,lineHeight:1.5,fontStyle:"italic"}}>{detalhe}</div>}
+              </div>
+            </div>
+          );
+        })}
+        {done===total&&total>0&&<div style={{margin:"8px 16px 0",background:"#0a2a0a",border:"1px solid #3a6a3a",borderRadius:8,padding:"8px 12px",fontSize:13,color:C.green,textAlign:"center"}}>
+          ✓ Protocolo concluido
+        </div>}
+      </div>}
+    </div>
+  );
+}
+
+// ─── APP PRINCIPAL ─────────────────────────────────────────────────────────────
+
+function App(){
+  const [fase,setFase]         = useState("campo");
+  const [aba,setAba]           = useState("protocolos"); // protocolos | escores | historico
+  const [diagnostico,setDiag]  = useState("");
+  const [paciente,setPac]      = useState("");
+  const [escores,setEscores]   = useState({});
+  const [historico,setHistorico] = useState([]);
+
+  useEffect(()=>{
+    setHistorico(lsGet(LS_AVAL,[]));
+  },[]);
+
+  const salvarAvaliacao = (reg) => {
+    const novo = [...historico, {...reg,paciente,fase}];
+    setHistorico(novo);
+    lsSet(LS_AVAL,novo);
+  };
+
+  const limparHistorico = () => {
+    if(window.confirm("Limpar todo o historico de avaliacoes?")){ setHistorico([]); lsSet(LS_AVAL,[]); }
+  };
+
+  const faseAtual = PROTOCOLOS[fase];
+  const total = ESCORES_CONFIG.reduce((s,e)=>s+(escores[e.id]||0),0);
+  const riscoGeral = total<=4?[C.green,"Estavel"]:total<=8?[C.amber,"Atencao"]:[C.red,total<=12?"Grave":"Critico"];
+
+  const FASES = [
+    {id:"campo",  label:"Campo",   icon:"🚨", cor:C.red},
+    {id:"preop",  label:"Pre-op",  icon:"🏥", cor:C.amber},
+    {id:"posop",  label:"Pos-op",  icon:"⚡", cor:C.blue},
+    {id:"alta",   label:"Alta",    icon:"🌿", cor:C.green},
+  ];
+
+  return(
+    <div style={{fontFamily:"Georgia,serif",background:C.bg,minHeight:"100vh",color:C.text}}>
+
+      {/* HEADER */}
+      <div style={{background:"linear-gradient(180deg,#131828,#0a0e1a)",borderBottom:"1px solid "+C.bord,padding:"14px 16px 0",position:"sticky",top:0,zIndex:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <span style={{fontSize:26}}>🏇</span>
+          <div style={{flex:1}}>
+            <div style={{fontSize:17,fontWeight:700,color:C.red}}>EquiVet UTI</div>
+            <div style={{fontSize:10,color:C.dim,textTransform:"uppercase",letterSpacing:"0.08em"}}>Colica Cirurgica — Pre e Pos-Operatorio</div>
+          </div>
+          {total>0&&<Badge cor={riscoGeral[0]}>{riscoGeral[1]}</Badge>}
+        </div>
+
+        {/* Input paciente */}
+        <input placeholder="Nome do paciente..." value={paciente} onChange={e=>setPac(e.target.value)} style={{...IS,marginBottom:10,fontSize:13}}/>
+
+        {/* Fases */}
+        <div style={{display:"flex",gap:0,overflowX:"auto"}}>
+          {FASES.map(f=>(
+            <button key={f.id} onClick={()=>setFase(f.id)} style={{
+              background:fase===f.id?f.cor+"22":"transparent",
+              color:fase===f.id?f.cor:C.muted,
+              border:"none",borderBottom:fase===f.id?"2px solid "+f.cor:"2px solid transparent",
+              padding:"8px 14px",cursor:"pointer",fontSize:12,fontWeight:fase===f.id?700:400,
+              whiteSpace:"nowrap",flexShrink:0,
+            }}>{f.icon} {f.label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{padding:"16px"}}>
+
+        {/* Cabecalho da fase */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:16,fontWeight:700,color:faseAtual.cor}}>{faseAtual.icon} {faseAtual.titulo}</div>
+          <div style={{fontSize:12,color:C.dim}}>{faseAtual.subtitulo}</div>
+        </div>
+
+        {/* Diagnostico */}
+        <div style={{marginBottom:14}}>
+          <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Diagnostico principal</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+            {faseAtual.diagnosticos.map(d=>(
+              <button key={d} onClick={()=>setDiag(d===diagnostico?"":d)} style={{
+                background:diagnostico===d?faseAtual.cor+"22":"transparent",
+                color:diagnostico===d?faseAtual.cor:C.muted,
+                border:"1px solid "+(diagnostico===d?faseAtual.cor:C.bord),
+                padding:"5px 12px",borderRadius:16,cursor:"pointer",fontSize:12,
+              }}>{d}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sub-abas */}
+        <div style={{display:"flex",gap:0,borderBottom:"1px solid "+C.bord,marginBottom:16}}>
+          {[["protocolos","Protocolos"],["escores","Escores"],["historico","Historico"]].map(([id,label])=>(
+            <button key={id} onClick={()=>setAba(id)} style={{
+              background:"transparent",color:aba===id?faseAtual.cor:C.muted,
+              border:"none",borderBottom:aba===id?"2px solid "+faseAtual.cor:"2px solid transparent",
+              padding:"8px 16px",cursor:"pointer",fontSize:13,fontWeight:aba===id?700:400,
+            }}>{label}</button>
+          ))}
+        </div>
+
+        {/* PROTOCOLOS */}
+        {aba==="protocolos"&&<div>
+          {faseAtual.protocolos
+            .filter(p => {
+              if(!diagnostico) return true;
+              const nome = p.nome.toLowerCase();
+              const diag = diagnostico.toLowerCase();
+              if(diag.includes("deslocamento") && nome.includes("hernia")) return false;
+              if((diag.includes("hernia")||diag.includes("encarceramento")) && nome.includes("deslocamento")) return false;
+              return true;
+            })
+            .map((p,i)=><ProtocoloCard key={i} protocolo={p}/>)
+          }
+        </div>}
+
+        {/* ESCORES */}
+        {aba==="escores"&&<EscoreWidget escores={escores} setEscores={setEscores}/>}
+
+        {/* HISTORICO */}
+        {aba==="historico"&&<div>
+          <HistoricoWidget historico={historico} onSalvar={salvarAvaliacao} escores={escores}/>
+          {historico.length>0&&<button onClick={limparHistorico} style={{background:"transparent",color:C.dim,border:"1px solid "+C.bord,borderRadius:8,padding:"7px 14px",cursor:"pointer",fontSize:12,marginTop:8}}>Limpar historico</button>}
+        </div>}
+
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+<script>
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+</script>
+</body>
+</html>

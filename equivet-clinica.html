@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="EquiVet"/>
+  <meta name="theme-color" content="#0f1117"/>
+  <link rel="manifest" href="manifest-clinica.json"/>
+  <title>EquiVet Clinica</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+    body{margin:0;padding:0;background:#0f1117;font-family:Georgia,serif;color:#e8e0d0;}
+    input,textarea,button{font-family:Georgia,serif;}
+    input:focus,textarea:focus{outline:2px solid #d4a96a;outline-offset:1px;}
+    ::-webkit-scrollbar{width:4px;}
+    ::-webkit-scrollbar-track{background:#1a1f2e;}
+    ::-webkit-scrollbar-thumb{background:#2a3040;border-radius:2px;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const BASE = [
+  { id:1, titulo:"Laminite Aguda", categoria:"Ortopedia", icon:"🦵",
+    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Laminite Aguda\n\nMEDICAMENTOS:\n1. Fenilbutazona 1g/comprimido\n   Dose: 4,4 mg/kg VO, 2x/dia por 5 dias\n\n2. Omeprazol equino 2,28 g\n   Dose: 1 sache VO, 1x/dia por 7 dias\n   (protecao gastrica durante AINE)\n\n3. DMSO gel\n   Aplicar nas muralhas dos cascos 2x/dia por 7 dias\n\nSUPORTE:\n- Baia com cama funda de areia\n- Gelo nas muralhas 20 min, 3x/dia por 3 dias\n- Casqueamento corretivo em 48-72h\n- Radiografia de navicular indicada\n\nRETORNO: 7 dias\n\nDr. Ricardo | CRMV-ES [No]" },
+  { id:2, titulo:"Colica Espamodica", categoria:"Gastroenterologia", icon:"🫁",
+    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Colica Espamodica\n\nTRATAMENTO EM CAMPO:\n- Dipirona sodica 50% - 30 mL IV lento\n- Buscopan - 20 mL IV lento\n- Flunixina meglumina 50 mg/mL - 1,1 mg/kg IV\n\nPOS-ATENDIMENTO:\n1. Dipirona oral 500 mg/mL - 20 mL VO a cada 8h, ate 3 dias\n2. Probiotico equino - 1 sache/dia VO por 7 dias\n\nOBSERVACOES:\n- Jejum por 2h apos melhora\n- Ligar imediatamente se dor nao cede em 1h\n\nRETORNO: Recidiva em 7 dias indica exame de imagem\n\nDr. Ricardo | CRMV-ES [No]" },
+  { id:3, titulo:"Hernia Umbilical", categoria:"Cirurgia", icon:"🐴",
+    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Hernia Umbilical nao complicada\n\nPRE-PROCEDIMENTO:\n1. Xilazina 10% - 0,5-1 mg/kg IM\n2. Lidocaina 2% - infiltracao local\n\nPOS-PROCEDIMENTO:\n1. Penicilina G Benzatina 300.000 UI/mL - 22.000 UI/kg IM, dose unica\n2. Flunixina meglumina 50 mg/mL - 1,1 mg/kg IM, 1x/dia por 3 dias\n\nCUIDADOS:\n- Inspecionar anel diariamente\n- Queda espontanea em 7-15 dias\n- Alerta: febre, dor intensa, odor fetido\n\nRETORNO: 15 dias\n\nDr. Ricardo | CRMV-ES [No]" },
+  { id:4, titulo:"Leptospirose Equina", categoria:"Infectologia", icon:"🔬",
+    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Leptospirose Equina (sorovar [ICTEROHAEMORRHAGIAE / outro])\n\nTRATAMENTO:\n1. Penicilina G Procaina 300.000 UI/mL - 22.000 UI/kg IM, 2x/dia por 7 dias\nOU\n1. Oxitetraciclina 200 mg/mL - 6,6 mg/kg IV lento em SF 0,9%, 1x/dia por 5 dias\n\nSUPORTE:\n2. Ringer com Lactato - 10-20 L IV/dia por 3 dias\n3. Flunixina meglumina - 1,1 mg/kg IV 1x/dia por 3 dias\n4. Vitamina B12 - 1 mL/100kg IM, 3x/semana por 2 semanas\n\nMANEJO DO PLANTEL:\n- Vacinar com Lexington 8 (D0, D28, reforco anual)\n- Controle de roedores e fontes d'agua\n\nRETORNO: 7 dias + SAM apos 30 dias\n\nDr. Ricardo | CRMV-ES [No]" },
+  { id:5, titulo:"Ferida / Laceracao", categoria:"Cirurgia", icon:"🩹",
+    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Laceracao - [LOCALIZACAO]\n\nTRATAMENTO EM CAMPO:\n- Limpeza com SF 0,9%\n- Desbridamento\n- Sutura: [sim/nao] - [tipo]\n\nMEDICAMENTOS:\n1. Penicilina G Benzatina - 22.000 UI/kg IM a cada 48h por 3 aplicacoes\n2. Flunixina meglumina - 1,1 mg/kg IM 1x/dia por 5 dias\n3. Spray cicatrizante - 2x/dia apos limpeza\n\nCURATIVO: Clorexidina 0,2% 1x/dia, oclusivo trocado diariamente\nSORO ANTITETANICO: [APLICADO / APLICAR - 5.000 UI IM]\n\nRETORNO: 5-7 dias\n\nDr. Ricardo | CRMV-ES [No]" },
+  { id:6, titulo:"Conjuntivite / Uveite", categoria:"Oftalmologia", icon:"👁️",
+    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: [Conjuntivite Bacteriana / Uveite Equina Recorrente]\n\nMEDICAMENTOS OCULARES:\n1. Colirio Neomicina + Polimixina B + Dexametasona\n   2 gotas, 3x/dia por 7 dias (somente se ulcera descartada)\n2. Atropina 1% colirio - 1 gota, 2x/dia por 5 dias (somente em uveite)\n\nSISTEMICO:\n3. Flunixina meglumina - 1,1 mg/kg IM 1x/dia por 5 dias\n\nCUIDADOS:\n- Manter em local sombreado\n- Nao usar corticoide sem descartar ulcera\n\nRETORNO: 7 dias\n\nDr. Ricardo | CRMV-ES [No]" },
+];
+
+const NOVO_TPL = (t) => "PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: " + t + "\n\nMEDICAMENTOS:\n1. [MEDICAMENTO]\n   Dose: [DOSE]\n   Via: [VO / IM / IV]\n   Duracao: [X dias]\n\nMEDIDAS DE SUPORTE:\n- [OBSERVACAO]\n\nRETORNO: [PRAZO]\n\nDr. Ricardo | CRMV-ES [No]";
+
+const ICONS = ["🐎","🦵","🫁","🐴","🔬","🩹","👁️","💉","🦷","🫀","🧬","🩻","🌡️","💊","🧪","🏥"];
+const CATS  = ["Clinica Geral","Ortopedia","Gastroenterologia","Cirurgia","Infectologia","Oftalmologia","Reproducao","Neurologia"];
+const LS1 = "ev_custom_v5";
+const LS2 = "ev_extra_v5";
+
+function lsGet(k,fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch{ return fb; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
+
+const C = {bg:"#0f1117",card:"#1a1f2e",bord:"#2a3040",gold:"#d4a96a",green:"#6abf69",muted:"#7a8a9a",text:"#e8e0d0",dim:"#5a6a7a"};
+const IS = {background:C.card,border:"1px solid "+C.bord,borderRadius:8,color:C.text,padding:"8px 12px",fontSize:14,outline:"none",boxSizing:"border-box",width:"100%"};
+
+function LinhaCobranca({label,valor,ativa}){
+  if(!ativa) return null;
+  return React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",background:C.card,border:"1px solid "+C.bord,borderRadius:8,padding:"8px 12px",marginBottom:6}},
+    React.createElement("span",{style:{fontSize:13,color:"#c8c0b0"}},label),
+    React.createElement("span",{style:{fontSize:13,color:C.gold,fontWeight:600}},"R$ "+valor.toFixed(2).replace(".",","))
+  );
+}
+
+const {useState,useEffect} = React;
+
+function App(){
+  const [aba,setAba]         = useState("prescricoes");
+  const [paciente,setPac]    = useState("");
+  const [prop,setProp]       = useState("");
+  const [custom,setCustom]   = useState({});
+  const [extra,setExtra]     = useState([]);
+  const [filtro,setFiltro]   = useState("Todas");
+  const [tela,setTela]       = useState("lista");
+  const [aberta,setAberta]   = useState(null);
+  const [texto,setTexto]     = useState("");
+  const [salvo,setSalvo]     = useState(false);
+  const [confReset,setCR]    = useState(false);
+  const [confDel,setCD]      = useState(false);
+  const [novoTit,setNT]      = useState("");
+  const [novoCat,setNC]      = useState("Clinica Geral");
+  const [novoCatC,setNCC]    = useState("");
+  const [novoIcon,setNI]     = useState("🐎");
+  const [visita,setVisita]   = useState(true);
+  const [km,setKm]           = useState("");
+  const [rx,setRx]           = useState("");
+  const [cirug,setCirug]     = useState(false);
+  const [vlCirug,setVlC]     = useState("2000");
+  const [descC,setDescC]     = useState("Procedimento cirurgico");
+  const [itens,setItens]     = useState([]);
+  const [avulso,setAvulso]   = useState({nome:"",valor:""});
+  const [copiado,setCopiado] = useState(false);
+
+  useEffect(()=>{ setCustom(lsGet(LS1,{})); setExtra(lsGet(LS2,[])); },[]);
+
+  const todas = [...BASE,...extra];
+  const cats  = ["Todas",...new Set(todas.map(p=>p.categoria))];
+  const lista = filtro==="Todas"?todas:todas.filter(p=>p.categoria===filtro);
+  const getTpl  = p => custom[p.id]!==undefined?custom[p.id]:p.template;
+  const isPers  = p => custom[p.id]!==undefined;
+  const isExtra = p => extra.some(e=>e.id===p.id);
+
+  const inject = txt => {
+    const hoje = new Date().toLocaleDateString("pt-BR");
+    return txt.replace(/\[DATA\]/g,hoje)
+      .replace(/\[NOME DO ANIMAL[^\]]*\]/g,paciente||"[NOME DO ANIMAL]")
+      .replace(/\[NOME DO PROPRIETARIO\]/g,prop||"[NOME DO PROPRIETARIO]");
+  };
+
+  const abrirEditor = p => { setTexto(inject(getTpl(p))); setAberta(p); setSalvo(false); setCR(false); setCD(false); setTela("editor"); };
+
+  const salvar = () => {
+    if(!aberta) return;
+    const hoje = new Date().toLocaleDateString("pt-BR");
+    let tpl = texto;
+    if(paciente) tpl=tpl.replace(new RegExp(paciente.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"g"),"[NOME DO ANIMAL]");
+    if(prop)     tpl=tpl.replace(new RegExp(prop.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"g"),"[NOME DO PROPRIETARIO]");
+    tpl=tpl.replace(hoje,"[DATA]");
+    const u={...custom,[aberta.id]:tpl}; lsSet(LS1,u); setCustom(u);
+    setSalvo(true); setTimeout(()=>setSalvo(false),3000);
+  };
+
+  const restaurar = () => {
+    if(!aberta) return;
+    const u={...custom}; delete u[aberta.id]; lsSet(LS1,u); setCustom(u);
+    setTexto(inject(aberta.template)); setCR(false);
+  };
+
+  const excluir = () => {
+    if(!aberta||!isExtra(aberta)) return;
+    const ue=extra.filter(e=>e.id!==aberta.id);
+    const uc={...custom}; delete uc[aberta.id];
+    lsSet(LS2,ue); lsSet(LS1,uc); setExtra(ue); setCustom(uc); setAberta(null); setTela("lista");
+  };
+
+  const criar = () => {
+    if(!novoTit.trim()) return;
+    const cat = novoCatC.trim()||novoCat;
+    const nova = {id:"cx_"+Date.now(),titulo:novoTit.trim(),categoria:cat,icon:novoIcon,template:NOVO_TPL(novoTit.trim())};
+    const ue=[...extra,nova]; lsSet(LS2,ue); setExtra(ue);
+    setNT(""); setNC("Clinica Geral"); setNCC(""); setNI("🐎");
+    abrirEditor(nova);
+  };
+
+  const copiar = () => { navigator.clipboard.writeText(texto); setCopiado(true); setTimeout(()=>setCopiado(false),2000); };
+
+  const vV = visita?1600:0;
+  const vK = km&&parseFloat(km)>0?parseFloat(km)*1.5:0;
+  const nR = rx&&parseInt(rx)>0?parseInt(rx):0;
+  const vR = nR*70;
+  const vC = cirug&&vlCirug?parseFloat(vlCirug):0;
+  const total = vV+vK+vR+vC+itens.reduce((a,i)=>a+i.valor*i.qty,0);
+
+  const addAv = () => {
+    if(!avulso.nome||!avulso.valor) return;
+    setItens([...itens,{uid:Date.now(),nome:avulso.nome,valor:parseFloat(avulso.valor),qty:1}]);
+    setAvulso({nome:"",valor:""});
+  };
+
+  const msg = () => {
+    const hoje=new Date().toLocaleDateString("pt-BR");
+    const ls=[];
+    if(visita) ls.push("  - Visita clinica: R$ 1.600,00");
+    if(vK>0)   ls.push("  - Deslocamento ("+parseFloat(km).toFixed(0)+" km x R$ 1,50): R$ "+vK.toFixed(2).replace(".",","));
+    if(vR>0)   ls.push("  - Radiografia"+(nR>1?"s":"")+" ("+nR+" posicao"+(nR>1?"oes":"")+" x R$ 70,00): R$ "+vR.toFixed(2).replace(".",","));
+    if(vC>0)   ls.push("  - "+descC+": R$ "+vC.toFixed(2).replace(".",","));
+    itens.forEach(i=>ls.push("  - "+i.nome+(i.qty>1?" (x"+i.qty+")":"")+": R$ "+(i.valor*i.qty).toFixed(2).replace(".",",")));
+    return "Ola! Segue o atendimento:\n\nPaciente: "+(paciente||"-")+"\nProprietario: "+(prop||"-")+"\nData: "+hoje+"\n\n"+ls.join("\n")+"\n\nTOTAL: R$ "+total.toFixed(2).replace(".",",")+"\n\nChave PIX: [SEU PIX]\nDr. Ricardo | CRMV-ES [No]";
+  };
+
+  const BtnV = ({onClick,children,style}) => <button onClick={onClick} style={{background:"#2a4a2a",color:C.green,border:"1px solid #3a6a3a",borderRadius:8,padding:"8px 14px",cursor:"pointer",fontSize:13,fontWeight:700,...style}}>{children}</button>;
+  const BtnS = ({onClick,children,style}) => <button onClick={onClick} style={{background:"transparent",color:C.muted,border:"1px solid "+C.bord,borderRadius:8,padding:"6px 13px",cursor:"pointer",fontSize:13,...style}}>{children}</button>;
+  const BtnP = ({onClick,children,style}) => <button onClick={onClick} style={{background:C.gold,color:"#0f1117",border:"none",borderRadius:8,padding:"8px 15px",cursor:"pointer",fontSize:13,fontWeight:700,...style}}>{children}</button>;
+  const Sec  = ({children}) => <div style={{fontSize:10,color:C.gold,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8,marginTop:16}}>{children}</div>;
+
+  return (
+    <div style={{fontFamily:"Georgia,serif",background:C.bg,minHeight:"100vh",color:C.text}}>
+
+      {/* HEADER */}
+      <div style={{background:"linear-gradient(135deg,#1a1f2e,#0f1117)",borderBottom:"1px solid "+C.bord,padding:"16px 16px 0",position:"sticky",top:0,zIndex:10}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+          <span style={{fontSize:26}}>🐎</span>
+          <div>
+            <div style={{fontSize:18,fontWeight:700,color:C.gold}}>EquiVet Clinica</div>
+            <div style={{fontSize:10,color:C.dim,letterSpacing:"0.08em",textTransform:"uppercase"}}>Prescricoes &amp; Cobranca</div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+          <input placeholder="Nome do animal" value={paciente} onChange={e=>setPac(e.target.value)} style={{...IS,width:"auto",flex:1,minWidth:140,fontSize:13}}/>
+          <input placeholder="Proprietario" value={prop} onChange={e=>setProp(e.target.value)} style={{...IS,width:"auto",flex:1,minWidth:140,fontSize:13}}/>
+        </div>
+        <div style={{display:"flex"}}>
+          {["prescricoes","cobranca"].map(a=>(
+            <button key={a} onClick={()=>{setAba(a);setTela("lista");}} style={{background:aba===a?C.gold:"transparent",color:aba===a?"#0f1117":C.muted,border:"none",padding:"8px 18px",cursor:"pointer",fontSize:12,fontWeight:700,textTransform:"uppercase",borderRadius:"6px 6px 0 0"}}>
+              {a==="prescricoes"?"Prescricoes":"Cobranca"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{padding:"16px"}}>
+
+        {/* LISTA */}
+        {aba==="prescricoes"&&tela==="lista"&&<>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14,flexWrap:"wrap",gap:8}}>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {cats.map(c=><button key={c} onClick={()=>setFiltro(c)} style={{background:filtro===c?"#d4a96a22":"transparent",color:filtro===c?C.gold:C.muted,border:"1px solid "+(filtro===c?C.gold:C.bord),padding:"4px 10px",borderRadius:16,cursor:"pointer",fontSize:11}}>{c}</button>)}
+            </div>
+            <BtnV onClick={()=>setTela("novo")}>+ Novo</BtnV>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10}}>
+            {lista.map(p=>{
+              const pers=isPers(p),ex=isExtra(p),bc=ex?"#3a5a8a":pers?"#3a6a3a":C.bord;
+              return <div key={p.id} onClick={()=>abrirEditor(p)}
+                style={{background:C.card,border:"1px solid "+bc,borderRadius:12,padding:"14px",cursor:"pointer",position:"relative",touchAction:"manipulation"}}
+                onTouchStart={e=>e.currentTarget.style.background="#1e2438"}
+                onTouchEnd={e=>e.currentTarget.style.background=C.card}>
+                {ex&&<div style={{position:"absolute",top:8,right:8,fontSize:9,color:"#6a9abf",background:"#1a2a3e",border:"1px solid #3a5a8a",borderRadius:6,padding:"1px 5px"}}>MEU</div>}
+                {!ex&&pers&&<div style={{position:"absolute",top:8,right:8,fontSize:9,color:C.green,background:"#1a2e1a",border:"1px solid #3a6a3a",borderRadius:6,padding:"1px 5px"}}>EDIT</div>}
+                <div style={{fontSize:24,marginBottom:5}}>{p.icon}</div>
+                <div style={{fontSize:13,fontWeight:700,color:C.text,marginBottom:2,lineHeight:1.2}}>{p.titulo}</div>
+                <div style={{fontSize:10,color:C.gold,textTransform:"uppercase"}}>{p.categoria}</div>
+              </div>;
+            })}
+          </div>
+        </>}
+
+        {/* NOVO DIAGNOSTICO */}
+        {aba==="prescricoes"&&tela==="novo"&&<div>
+          <BtnS onClick={()=>setTela("lista")} style={{marginBottom:16}}>Voltar</BtnS>
+          <div style={{fontSize:17,fontWeight:700,color:C.gold,marginBottom:16}}>Novo diagnostico</div>
+
+          <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Nome</div>
+          <input value={novoTit} onChange={e=>setNT(e.target.value)} placeholder="Ex: Adenite Equina, Babesiose..." style={{...IS,marginBottom:16,fontSize:14}}/>
+
+          <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Categoria</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+            {CATS.map(c=><button key={c} onClick={()=>{setNC(c);setNCC("");}} style={{background:(novoCat===c&&!novoCatC)?"#d4a96a22":"transparent",color:(novoCat===c&&!novoCatC)?C.gold:C.muted,border:"1px solid "+((novoCat===c&&!novoCatC)?C.gold:C.bord),padding:"5px 12px",borderRadius:18,cursor:"pointer",fontSize:12}}>{c}</button>)}
+          </div>
+          <input value={novoCatC} onChange={e=>setNCC(e.target.value)} placeholder="Ou digite categoria nova..." style={{...IS,marginBottom:16,fontSize:13}}/>
+
+          <div style={{fontSize:11,color:C.muted,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Icone</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:20}}>
+            {ICONS.map(ic=><button key={ic} onClick={()=>setNI(ic)} style={{background:novoIcon===ic?"#d4a96a22":"transparent",border:"1px solid "+(novoIcon===ic?C.gold:C.bord),borderRadius:8,padding:"5px 8px",cursor:"pointer",fontSize:22,lineHeight:1}}>{ic}</button>)}
+          </div>
+
+          {novoTit.trim()&&<div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:"12px 14px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+            <span style={{fontSize:22}}>{novoIcon}</span>
+            <div>
+              <div style={{fontWeight:700,color:C.text}}>{novoTit}</div>
+              <div style={{fontSize:11,color:C.gold,textTransform:"uppercase"}}>{novoCatC||novoCat}</div>
+            </div>
+          </div>}
+
+          <button onClick={criar} disabled={!novoTit.trim()} style={{background:novoTit.trim()?C.gold:"#3a3a3a",color:novoTit.trim()?"#0f1117":C.muted,border:"none",borderRadius:10,padding:"13px",cursor:novoTit.trim()?"pointer":"default",fontSize:15,fontWeight:700,width:"100%"}}>
+            {novoTit.trim()?"Criar e editar protocolo":"Preencha o nome acima"}
+          </button>
+        </div>}
+
+        {/* EDITOR */}
+        {aba==="prescricoes"&&tela==="editor"&&aberta&&<div>
+          <BtnS onClick={()=>setTela("lista")} style={{marginBottom:12}}>Voltar</BtnS>
+          <div style={{marginBottom:10}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.gold,marginBottom:2}}>{aberta.icon} {aberta.titulo}</div>
+            <div style={{fontSize:11,color:C.dim}}>Edite livremente - salve para gravar</div>
+          </div>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+            <BtnV onClick={salvar} style={{background:salvo?"#1a3a1a":"#2a4a2a"}}>{salvo?"Salvo!":"Salvar modelo"}</BtnV>
+            {!isExtra(aberta)&&isPers(aberta)&&!confReset&&<BtnS onClick={()=>setCR(true)}>Restaurar</BtnS>}
+            {confReset&&<>
+              <span style={{fontSize:12,color:"#c07050",alignSelf:"center"}}>Confirmar?</span>
+              <BtnS onClick={restaurar} style={{color:"#c07050",borderColor:"#c07050"}}>Sim</BtnS>
+              <BtnS onClick={()=>setCR(false)}>Nao</BtnS>
+            </>}
+            {isExtra(aberta)&&!confDel&&<BtnS onClick={()=>setCD(true)} style={{color:"#c07050",borderColor:"#5a3030"}}>Excluir</BtnS>}
+            {confDel&&<>
+              <span style={{fontSize:12,color:"#c07050",alignSelf:"center"}}>Excluir?</span>
+              <BtnS onClick={excluir} style={{color:"#c07050",borderColor:"#c07050"}}>Sim</BtnS>
+              <BtnS onClick={()=>setCD(false)}>Nao</BtnS>
+            </>}
+            <BtnP onClick={copiar}>{copiado?"Copiado!":"Copiar"}</BtnP>
+          </div>
+          {salvo&&<div style={{background:"#1a2e1a",border:"1px solid #3a6a3a",borderRadius:8,padding:"8px 12px",marginBottom:8,fontSize:13,color:C.green}}>Modelo salvo com sucesso!</div>}
+          <textarea value={texto} onChange={e=>setTexto(e.target.value)} style={{width:"100%",minHeight:420,background:C.card,border:"1px solid "+C.bord,borderRadius:10,color:C.text,fontFamily:"'Courier New',monospace",fontSize:13,lineHeight:1.75,padding:14,resize:"vertical",boxSizing:"border-box",outline:"none"}}/>
+          <div style={{fontSize:11,color:C.dim,marginTop:6}}>Preencha os [colchetes] e clique em Salvar modelo.</div>
+        </div>}
+
+        {/* COBRANCA */}
+        {aba==="cobranca"&&<div>
+          {/* Visita */}
+          <Sec>Visita clinica</Sec>
+          <div onClick={()=>setVisita(!visita)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:visita?"#1e2e1e":C.card,border:"1px solid "+(visita?"#3a6a3a":C.bord),borderRadius:10,padding:"12px 14px",cursor:"pointer",marginBottom:4,touchAction:"manipulation"}}>
+            <div>
+              <div style={{fontSize:14,fontWeight:700,color:visita?C.green:C.muted}}>{visita?"Incluido":"Nao incluido"}</div>
+              <div style={{fontSize:11,color:C.dim}}>Toque para alternar</div>
+            </div>
+            <div style={{fontSize:17,fontWeight:700,color:visita?C.gold:"#3a4a5a"}}>R$ 1.600,00</div>
+          </div>
+
+          {/* Km */}
+          <Sec>Deslocamento</Sec>
+          <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:"12px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,color:C.muted,marginBottom:4}}>Quilometros</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <input type="number" min="0" placeholder="0" value={km} onChange={e=>setKm(e.target.value)} style={{...IS,width:80,fontSize:18,fontWeight:700,textAlign:"center"}}/>
+                  <span style={{fontSize:12,color:C.dim}}>km x R$1,50</span>
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:11,color:C.dim}}>Total</div>
+                <div style={{fontSize:16,fontWeight:700,color:vK>0?C.gold:"#3a4a5a"}}>R$ {vK.toFixed(2).replace(".",",")}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Rx */}
+          <Sec>Radiografias</Sec>
+          <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:"12px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,color:C.muted,marginBottom:4}}>Posicoes</div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <button onClick={()=>setRx(v=>Math.max(0,(parseInt(v)||0)-1).toString())} style={{background:"#2a3040",color:C.text,border:"none",borderRadius:6,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
+                  <input type="number" min="0" placeholder="0" value={rx} onChange={e=>setRx(e.target.value)} style={{...IS,width:60,fontSize:18,fontWeight:700,textAlign:"center"}}/>
+                  <button onClick={()=>setRx(v=>((parseInt(v)||0)+1).toString())} style={{background:"#2a3040",color:C.text,border:"none",borderRadius:6,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  <span style={{fontSize:12,color:C.dim}}>x R$70</span>
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:11,color:C.dim}}>Total</div>
+                <div style={{fontSize:16,fontWeight:700,color:vR>0?C.gold:"#3a4a5a"}}>R$ {vR.toFixed(2).replace(".",",")}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Cirurgia */}
+          <Sec>Cirurgia</Sec>
+          <div style={{background:cirug?"#1e1a2e":C.card,border:"1px solid "+(cirug?"#5a3a8a":C.bord),borderRadius:10,padding:"12px 14px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:cirug?12:0}}>
+              <div onClick={()=>setCirug(!cirug)} style={{width:36,height:20,borderRadius:10,cursor:"pointer",background:cirug?"#8a6abf":"#2a3040",position:"relative",flexShrink:0,touchAction:"manipulation"}}>
+                <div style={{position:"absolute",top:3,left:cirug?18:3,width:14,height:14,borderRadius:"50%",background:"#fff",transition:"left 0.2s"}}/>
+              </div>
+              <span style={{fontSize:14,color:cirug?"#b090e0":C.muted,fontWeight:600}}>Incluir cirurgia</span>
+            </div>
+            {cirug&&<div style={{display:"flex",flexDirection:"column",gap:8}}>
+              <input placeholder="Descricao" value={descC} onChange={e=>setDescC(e.target.value)} style={IS}/>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {[2000,2500,3000].map(v=><button key={v} onClick={()=>setVlC(v.toString())} style={{background:vlCirug===v.toString()?"#5a3a8a":"#2a2040",color:vlCirug===v.toString()?"#e0d0ff":"#7a6a9a",border:"1px solid "+(vlCirug===v.toString()?"#8a6abf":"#3a3050"),borderRadius:8,padding:"7px 12px",cursor:"pointer",fontSize:13,fontWeight:600}}>R$ {v.toLocaleString("pt-BR")}</button>)}
+                <input type="number" placeholder="Outro" value={vlCirug} onChange={e=>setVlC(e.target.value)} style={{...IS,width:100}}/>
+              </div>
+            </div>}
+          </div>
+
+          {/* Avulso */}
+          <Sec>Item avulso</Sec>
+          <input placeholder="Descricao" value={avulso.nome} onChange={e=>setAvulso({...avulso,nome:e.target.value})} style={{...IS,marginBottom:8}}/>
+          <div style={{display:"flex",gap:8,marginBottom:16}}>
+            <input placeholder="Valor R$" type="number" value={avulso.valor} onChange={e=>setAvulso({...avulso,valor:e.target.value})} style={{...IS,flex:1}}/>
+            <BtnP onClick={addAv}>+ Add</BtnP>
+          </div>
+
+          {/* Resumo */}
+          <Sec>Resumo</Sec>
+          {total===0&&<div style={{color:C.dim,fontSize:13,padding:"8px 0"}}>Nenhum servico selecionado.</div>}
+          <LinhaCobranca label="Visita clinica" valor={vV} ativa={visita}/>
+          <LinhaCobranca label={"Deslocamento ("+(parseFloat(km)||0)+" km)"} valor={vK} ativa={vK>0}/>
+          <LinhaCobranca label={"Radiografia"+(nR!==1?"s":"")+" ("+nR+" posicao"+(nR!==1?"oes":"")+")"} valor={vR} ativa={vR>0}/>
+          <LinhaCobranca label={descC||"Cirurgia"} valor={vC} ativa={cirug&&vC>0}/>
+          {itens.map(i=><div key={i.uid} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:C.card,border:"1px solid "+C.bord,borderRadius:8,padding:"7px 10px",marginBottom:5,gap:6}}>
+            <div style={{flex:1,fontSize:12,color:"#c8c0b0"}}>{i.nome}</div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              <button onClick={()=>setItens(itens.map(x=>x.uid===i.uid?{...x,qty:Math.max(1,x.qty-1)}:x))} style={{background:"#2a3040",color:C.text,border:"none",borderRadius:5,width:26,height:26,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
+              <span style={{fontSize:12,minWidth:16,textAlign:"center"}}>{i.qty}</span>
+              <button onClick={()=>setItens(itens.map(x=>x.uid===i.uid?{...x,qty:x.qty+1}:x))} style={{background:"#2a3040",color:C.text,border:"none",borderRadius:5,width:26,height:26,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+            </div>
+            <div style={{fontSize:12,color:C.gold,minWidth:60,textAlign:"right"}}>R$ {(i.valor*i.qty).toFixed(2).replace(".",",")}</div>
+            <button onClick={()=>setItens(itens.filter(x=>x.uid!==i.uid))} style={{background:"none",border:"none",color:"#7a3a3a",cursor:"pointer",fontSize:16,padding:"0 2px"}}>x</button>
+          </div>)}
+
+          {total>0&&<>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"2px solid #d4a96a44",paddingTop:12,marginTop:8,marginBottom:16}}>
+              <span style={{fontWeight:700,fontSize:15}}>TOTAL</span>
+              <span style={{fontWeight:700,fontSize:22,color:C.gold}}>R$ {total.toFixed(2).replace(".",",")}</span>
+            </div>
+            <Sec>Mensagem para o cliente</Sec>
+            <textarea readOnly value={msg()} style={{...IS,minHeight:210,fontFamily:"'Courier New',monospace",fontSize:12,lineHeight:1.6,marginBottom:8,resize:"vertical"}}/>
+            <BtnP onClick={()=>{navigator.clipboard.writeText(msg());setCopiado(true);setTimeout(()=>setCopiado(false),2000);}} style={{width:"100%",padding:"12px"}}>
+              {copiado?"Copiado!":"Copiar mensagem"}
+            </BtnP>
+          </>}
+        </div>}
+
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+<script>
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
+</script>
+</body>
+</html>
