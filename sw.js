@@ -1,29 +1,56 @@
-const CACHE = "equivet-v1";
+const CACHE = "equivet-v3";
 const FILES = [
   "./",
   "./index.html",
   "./equivet-clinica.html",
   "./equivet-uti.html",
+  "./manifest-clinica.json",
+  "./manifest-uti.json",
+  "./icon-clinica.svg",
   "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js",
-  "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"
+  "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js",
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"
 ];
 
+// Instala e faz cache de todos os arquivos essenciais
 self.addEventListener("install", e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())
+    caches.open(CACHE)
+      .then(c => c.addAll(FILES))
+      .then(() => self.skipWaiting())
   );
 });
 
+// Remove caches antigos ao ativar nova versão
 self.addEventListener("activate", e => {
   e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
+// Estratégia: cache primeiro, rede como fallback
+// Para arquivos do próprio app: cache first (garante offline)
+// Para chamadas ao Supabase/API: rede first, silencia erros
 self.addEventListener("fetch", e => {
+  const url = new URL(e.request.url);
+
+  // Supabase e outras APIs externas: tenta rede, ignora offline
+  if (url.hostname.includes("supabase.co") || url.hostname.includes("anthropic.com")) {
+    e.respondWith(
+      fetch(e.request).catch(() => new Response(
+        JSON.stringify({error: "offline"}),
+        {status: 503, headers: {"Content-Type":"application/json"}}
+      ))
+    );
+    return;
+  }
+
+  // Tudo mais: cache primeiro
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;

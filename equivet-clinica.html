@@ -12,6 +12,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
     body{margin:0;padding:0;background:#0f1117;font-family:Georgia,serif;color:#e8e0d0;}
@@ -27,6 +28,15 @@
 </head>
 <body>
 <div id="root"></div>
+
+<script>
+  // Inicialização do Supabase — chaves públicas, seguro no frontend
+  const SUPABASE_URL = 'https://lbtmdrhbhwvrytttevyw.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_w2ePaCDxExkCk4hKiszgyA_oQ6_rZt6';
+  // Sobrescreve o objeto da biblioteca com o cliente já inicializado
+  window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+</script>
+
 <script type="text/babel">
 
 // ============================================================================
@@ -408,7 +418,117 @@ function Vital({campo,valor,onChange}){
 // ============================================================================
 // APP PRINCIPAL
 // ============================================================================
-function App(){
+// ============================================================================
+// TELA DE LOGIN
+// ============================================================================
+function LoginScreen({ onLogin }) {
+  const [email,    setEmail]    = useState('');
+  const [senha,    setSenha]    = useState('');
+  const [modo,     setModo]     = useState('login'); // 'login' | 'cadastro'
+  const [erro,     setErro]     = useState('');
+  const [loading,  setLoading]  = useState(false);
+
+  const entrar = async () => {
+    setLoading(true); setErro('');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+    if (error) setErro('Email ou senha incorretos.');
+    else onLogin(data.user);
+    setLoading(false);
+  };
+
+  const cadastrar = async () => {
+    setLoading(true); setErro('');
+    const { data, error } = await supabase.auth.signUp({ email, password: senha });
+    if (error) setErro(error.message);
+    else if (data.user && data.session) onLogin(data.user);
+    else setErro('Conta criada! Verifique seu email para confirmar antes de entrar.');
+    setLoading(false);
+  };
+
+  const S = {
+    wrap:   { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0f1117', padding:20 },
+    card:   { background:'#15192a', border:'1px solid #2a3040', borderRadius:16, padding:32, width:'100%', maxWidth:360 },
+    logo:   { textAlign:'center', marginBottom:28 },
+    tabs:   { display:'flex', gap:8, marginBottom:20 },
+    tab:    (a) => ({ flex:1, padding:'8px', borderRadius:8, border:'1px solid', cursor:'pointer', fontFamily:'Georgia,serif', fontSize:13,
+                borderColor: modo===a ? '#d4a96a' : '#2a3040',
+                background:  modo===a ? '#d4a96a22' : 'transparent',
+                color:       modo===a ? '#d4a96a' : '#6a7090' }),
+    input:  { background:'#0f1320', border:'1px solid #2a3040', borderRadius:8, padding:'10px 12px',
+              color:'#e8e0d0', fontSize:14, width:'100%', fontFamily:'Georgia,serif' },
+    btn:    (ok) => ({ background: ok ? '#d4a96a' : '#2a3040', color: ok ? '#1a1510' : '#4a5060',
+                border:'none', borderRadius:8, padding:'12px', fontSize:15, fontWeight:700,
+                cursor: ok ? 'pointer' : 'default', fontFamily:'Georgia,serif', width:'100%', marginTop:4 }),
+    erro:   { background:'#3a1a1a', border:'1px solid #6a3030', borderRadius:8, padding:'8px 12px', color:'#e08070', fontSize:12, marginTop:4 },
+  };
+
+  const ok = !loading && email.includes('@') && senha.length >= 6;
+
+  return (
+    <div style={S.wrap}>
+      <div style={S.card}>
+        <div style={S.logo}>
+          <div style={{fontSize:40, marginBottom:8}}>🐎</div>
+          <div style={{fontSize:20, fontWeight:700, color:'#d4a96a', letterSpacing:'0.05em'}}>EquiVet Clínica</div>
+          <div style={{fontSize:11, color:'#6a7090', marginTop:4, textTransform:'uppercase', letterSpacing:'0.08em'}}>Centaurovet</div>
+        </div>
+
+        <div style={S.tabs}>
+          {[['login','Entrar'],['cadastro','Criar conta']].map(([m,l])=>(
+            <button key={m} style={S.tab(m)} onClick={()=>{setModo(m);setErro('');}}>{l}</button>
+          ))}
+        </div>
+
+        <div style={{display:'flex', flexDirection:'column', gap:10}}>
+          <input type="email" placeholder="Email" value={email}
+            onChange={e=>setEmail(e.target.value)} style={S.input} />
+          <input type="password" placeholder="Senha (mínimo 6 caracteres)" value={senha}
+            onChange={e=>setSenha(e.target.value)}
+            onKeyDown={e=>e.key==='Enter' && ok && (modo==='login' ? entrar() : cadastrar())}
+            style={S.input} />
+          {erro && <div style={S.erro}>{erro}</div>}
+          <button onClick={modo==='login' ? entrar : cadastrar} disabled={!ok} style={S.btn(ok)}>
+            {loading ? 'Aguarde...' : modo==='login' ? 'Entrar' : 'Criar conta'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// WRAPPER DE AUTENTICAÇÃO — verifica sessão e decide o que mostrar
+// ============================================================================
+function AuthWrapper() {
+  const [user,     setUser]     = useState(null);
+  const [checando, setChecando] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setChecando(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (checando) return (
+    <div style={{minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0f1117'}}>
+      <div style={{color:'#d4a96a', fontSize:15}}>🐎 Carregando...</div>
+    </div>
+  );
+
+  if (!user) return <LoginScreen onLogin={setUser} />;
+
+  return <App user={user} onLogout={()=>supabase.auth.signOut()} />;
+}
+
+// ============================================================================
+// APP PRINCIPAL
+// ============================================================================
+function App({ user, onLogout }){
   const [aba,setAba]         = useState("prescricoes");
   const [paciente,setPac]    = useState("");
   const [prop,setProp]       = useState("");
@@ -429,6 +549,7 @@ function App(){
   const [novoQ,setNovoQ]     = useState([]);
   const [editTags,setEditTags] = useState([]);
   const [visita,setVisita]   = useState(true);
+  const [vlVisita,setVlVisita] = useState(()=>lsGet("ev_vlvisita_v1",""));
   const [km,setKm]           = useState("");
   const [rx,setRx]           = useState("");
   const [cirug,setCirug]     = useState(false);
@@ -439,6 +560,7 @@ function App(){
   const [copiado,setCopiado] = useState(false);
   const [crmv,setCrmv]       = useState(()=>lsGet(LS_CRMV,""));
   const [pix,setPix]         = useState(()=>lsGet(LS_PIX,""));
+  const [showConfig,setShowConfig] = useState(false);
 
   // ---- ATENDIMENTO ----
   const [data,setData]            = useState(todayISO());
@@ -455,6 +577,7 @@ function App(){
   const [filtroAte,setFiltroAte]  = useState("");
   const [verTodosDiag,setVTD]     = useState(false);
   const [atendSalvo,setAS]        = useState(false);
+  const [salvoNuvem,setSN]        = useState(false); // true = gravado no Supabase
 
   useEffect(()=>{
     setCustom(lsGet(LS1,{}));
@@ -467,6 +590,7 @@ function App(){
   useEffect(()=>{ lsSet(LS_TAGS,baseTags); },[baseTags]);
   useEffect(()=>{ lsSet(LS_CRMV,crmv); },[crmv]);
   useEffect(()=>{ lsSet(LS_PIX,pix); },[pix]);
+  useEffect(()=>{ lsSet("ev_vlvisita_v1",vlVisita); },[vlVisita]);
 
   // Reset de aceitas ao trocar queixa
   useEffect(()=>{ setSugAceitas([]); setVTD(false); },[queixa]);
@@ -544,7 +668,7 @@ function App(){
   const copiar = () => { copyToClipboard(texto); setCopiado(true); setTimeout(()=>setCopiado(false),2000); };
 
   // === COBRANCA ===
-  const vV = visita?1600:0;
+  const vV = visita?parseFloat(vlVisita)||0:0;
   const vK = km&&parseFloat(km)>0?parseFloat(km)*1.5:0;
   const nR = rx&&parseInt(rx)>0?parseInt(rx):0;
   const vR = nR*70;
@@ -560,7 +684,7 @@ function App(){
   const msg = () => {
     const hoje=new Date().toLocaleDateString("pt-BR");
     const ls=[];
-    if(visita) ls.push("  - Visita clinica: R$ 1.600,00");
+    if(visita) ls.push("  - Visita clinica: R$ "+(parseFloat(vlVisita)||0).toFixed(2).replace(".",","));
     if(vK>0)   ls.push("  - Deslocamento ("+parseFloat(km).toFixed(0)+" km x R$ 1,50): R$ "+vK.toFixed(2).replace(".",","));
     if(vR>0)   ls.push("  - Radiografia"+(nR>1?"s":"")+" ("+nR+" posicao"+(nR>1?"oes":"")+" x R$ 70,00): R$ "+vR.toFixed(2).replace(".",","));
     if(vC>0)   ls.push("  - "+descC+": R$ "+vC.toFixed(2).replace(".",","));
@@ -597,9 +721,15 @@ function App(){
   });
 
   // === SALVAR ATENDIMENTO ===
-  const salvarAtendimento = () => {
+  const salvarAtendimento = async () => {
     if(!paciente.trim()){ alert("Informe o nome do animal no cabecalho."); return; }
     if(!queixa){ alert("Selecione uma queixa principal."); return; }
+
+    const prontuarioTexto = buildProntuario({queixa,modoExame,anamnese,exGeral,mods});
+    const exGeralFinal = modoExame==="completo"?{...exGeral,motilidade:{...exGeral.motilidade}}:null;
+    const modsFinal = JSON.parse(JSON.stringify(mods));
+
+    // 1. Salva no localStorage (sempre — funciona offline)
     const reg = {
       id:newId(),
       data,
@@ -608,13 +738,34 @@ function App(){
       queixa,
       modoExame,
       anamnese:{...anamnese},
-      exGeral:modoExame==="completo"?{...exGeral,motilidade:{...exGeral.motilidade}}:null,
-      mods:JSON.parse(JSON.stringify(mods)),
-      prontuarioTexto:buildProntuario({queixa,modoExame,anamnese,exGeral,mods}),
+      exGeral:exGeralFinal,
+      mods:modsFinal,
+      prontuarioTexto,
       criadoEm:new Date().toISOString(),
     };
     setAtend([reg,...atendimentos]);
-    setAS(true); setTimeout(()=>setAS(false),3000);
+    setAS(true); setTimeout(()=>setAS(false),4000);
+
+    // 2. Salva no Supabase (em paralelo — não bloqueia se falhar)
+    setSN(false);
+    try {
+      const { error } = await supabase.from('atendimentos').insert({
+        data_atendimento:  data,
+        paciente_nome:     paciente.trim(),
+        proprietario_nome: prop.trim() || null,
+        queixa,
+        modo_exame:        modoExame,
+        anamnese:          {...anamnese},
+        exame_geral:       exGeralFinal,
+        modulos:           modsFinal,
+        prontuario_texto:  prontuarioTexto,
+        veterinario_id:    user?.id || null,
+      });
+      if(!error){ setSN(true); setTimeout(()=>setSN(false),4000); }
+      else { console.warn('Supabase save error:', error.message); }
+    } catch(e) {
+      console.warn('Supabase offline, dado salvo só localmente:', e.message);
+    }
   };
 
   const limparAtendimento = () => {
@@ -700,10 +851,22 @@ function App(){
       <div style={{background:"linear-gradient(135deg,#1a1f2e,#0f1117)",borderBottom:"1px solid "+C.bord,padding:"16px 16px 0",position:"sticky",top:0,zIndex:10}}>
         <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
           <span style={{fontSize:26}}>🐎</span>
-          <div>
+          <div style={{flex:1}}>
             <div style={{fontSize:18,fontWeight:700,color:C.gold}}>EquiVet Clinica</div>
             <div style={{fontSize:10,color:C.dim,letterSpacing:"0.08em",textTransform:"uppercase"}}>Atendimento &middot; Prescricoes &middot; Cobranca</div>
           </div>
+          <button onClick={()=>setShowConfig(true)} title="Configuracoes do veterinario"
+            style={{background:"transparent",border:"1px solid #2a3040",borderRadius:8,padding:"5px 10px",
+              color:crmv?C.gold:C.dim,fontSize:13,cursor:"pointer"}}>
+            ⚙️
+          </button>
+          {onLogout && (
+            <button onClick={onLogout} title={"Sair: "+user?.email}
+              style={{background:"transparent",border:"1px solid #2a3040",borderRadius:8,padding:"5px 10px",
+                color:C.dim,fontSize:11,cursor:"pointer",fontFamily:"Georgia,serif"}}>
+              Sair
+            </button>
+          )}
         </div>
         <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
           <input placeholder="Nome do animal" value={paciente} onChange={e=>setPac(e.target.value)} style={{...IS,width:"auto",flex:1,minWidth:140,fontSize:13}}/>
@@ -1028,7 +1191,9 @@ function App(){
             <BtnP onClick={salvarAtendimento} disabled={!queixa} style={{flex:1,minWidth:200,padding:"12px"}}>{atendSalvo?"✓ Atendimento salvo":"💾 Salvar atendimento no historico"}</BtnP>
             <BtnS onClick={limparAtendimento}>Limpar formulario</BtnS>
           </div>
-          {atendSalvo&&<div style={{background:"#1a2e1a",border:"1px solid #3a6a3a",borderRadius:8,padding:"8px 12px",marginTop:8,fontSize:13,color:C.green}}>Atendimento gravado em historico local. Total: {atendimentos.length+1}</div>}
+          {atendSalvo&&<div style={{background:"#1a2e1a",border:"1px solid #3a6a3a",borderRadius:8,padding:"8px 12px",marginTop:8,fontSize:13,color:C.green}}>
+            ✓ Atendimento salvo {salvoNuvem ? "💾 local + ☁️ nuvem" : "💾 local"} — Total: {atendimentos.length+1}
+          </div>}
         </div>}
 
         {/* ====================== ABA PRESCRICOES (LISTA) ====================== */}
@@ -1132,12 +1297,26 @@ function App(){
         {/* ====================== COBRANCA ====================== */}
         {aba==="cobranca"&&<div>
           <Sec>Visita clinica</Sec>
-          <div onClick={()=>setVisita(!visita)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:visita?"#1e2e1e":C.card,border:"1px solid "+(visita?"#3a6a3a":C.bord),borderRadius:10,padding:"12px 14px",cursor:"pointer",marginBottom:4,touchAction:"manipulation"}}>
-            <div>
-              <div style={{fontSize:14,fontWeight:700,color:visita?C.green:C.muted}}>{visita?"Incluido":"Nao incluido"}</div>
-              <div style={{fontSize:11,color:C.dim}}>Toque para alternar</div>
+          <div style={{background:visita?"#1e2e1e":C.card,border:"1px solid "+(visita?"#3a6a3a":C.bord),borderRadius:10,padding:"12px 14px",marginBottom:4}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:visita?10:0,cursor:"pointer",touchAction:"manipulation"}} onClick={()=>setVisita(!visita)}>
+              <div>
+                <div style={{fontSize:14,fontWeight:700,color:visita?C.green:C.muted}}>{visita?"Incluida":"Nao incluida"}</div>
+                <div style={{fontSize:11,color:C.dim}}>Toque para alternar</div>
+              </div>
+              <div style={{fontSize:17,fontWeight:700,color:visita?C.gold:"#3a4a5a"}}>
+                {vlVisita ? "R$ "+parseFloat(vlVisita).toFixed(2).replace(".",",") : "—"}
+              </div>
             </div>
-            <div style={{fontSize:17,fontWeight:700,color:visita?C.gold:"#3a4a5a"}}>R$ 1.600,00</div>
+            {visita&&<div style={{display:"flex",alignItems:"center",gap:8}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:11,color:C.muted,whiteSpace:"nowrap"}}>R$</div>
+              <input
+                type="number" inputMode="decimal"
+                value={vlVisita}
+                onChange={e=>setVlVisita(e.target.value)}
+                placeholder="Valor da visita"
+                style={{...IS,flex:1,fontSize:14}}
+              />
+            </div>}
           </div>
 
           <Sec>Deslocamento</Sec>
@@ -1222,15 +1401,14 @@ function App(){
               <span style={{fontWeight:700,fontSize:15}}>TOTAL</span>
               <span style={{fontWeight:700,fontSize:22,color:C.gold}}>R$ {total.toFixed(2).replace(".",",")}</span>
             </div>
-            <Sec>Seus dados</Sec>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:C.muted,marginBottom:4}}>CRMV (ex: ES 12345)</div>
-                <input value={crmv} onChange={e=>setCrmv(e.target.value)} placeholder="ES 12345" style={IS}/>
-              </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:C.muted,marginBottom:4}}>Chave PIX</div>
-                <input value={pix} onChange={e=>setPix(e.target.value)} placeholder="CPF, e-mail ou telefone" style={IS}/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <Sec style={{margin:0}}>Seus dados</Sec>
+              <button onClick={()=>setShowConfig(true)} style={{background:"transparent",border:"none",color:C.gold,fontSize:11,cursor:"pointer",textDecoration:"underline",fontFamily:"Georgia,serif"}}>editar ⚙️</button>
+            </div>
+            <div style={{background:"#1a1f2e",border:"1px solid "+C.bord,borderRadius:8,padding:"10px 14px",marginBottom:10,fontSize:13}}>
+              <div style={{display:"flex",gap:16}}>
+                <div><span style={{color:C.muted,fontSize:11}}>CRMV: </span><span style={{color:crmv?C.text:C.dim}}>{crmv||"—  (configure em ⚙️)"}</span></div>
+                <div><span style={{color:C.muted,fontSize:11}}>PIX: </span><span style={{color:pix?C.text:C.dim}}>{pix||"—"}</span></div>
               </div>
             </div>
             <Sec>Mensagem para o cliente</Sec>
@@ -1242,6 +1420,35 @@ function App(){
         </div>}
 
       </div>
+
+      {/* ============== MODAL CONFIGURACOES ============== */}
+      {showConfig&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,padding:16}}>
+        <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:14,width:"100%",maxWidth:420,padding:24}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <div style={{fontSize:16,fontWeight:700,color:C.gold}}>⚙️ Seus dados</div>
+            <button onClick={()=>setShowConfig(false)} style={{background:"none",border:"none",color:C.muted,fontSize:22,cursor:"pointer"}}>×</button>
+          </div>
+          <div style={{fontSize:12,color:C.dim,marginBottom:16,lineHeight:1.6}}>
+            Preenchidos uma vez e salvos automaticamente. Aparecem em todas as cobranças.
+          </div>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:11,color:C.muted,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>CRMV (UF + número)</div>
+            <input value={crmv} onChange={e=>setCrmv(e.target.value)}
+              placeholder="Ex: ES 12345 ou SP 67890"
+              style={{...IS,width:"100%",fontSize:15}}/>
+            <div style={{fontSize:10,color:C.dim,marginTop:4}}>Aparece na mensagem: Dr. Ricardo | CRMV-{crmv||"[UF NÚMERO]"}</div>
+          </div>
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,color:C.muted,marginBottom:4,textTransform:"uppercase",letterSpacing:"0.06em"}}>Chave PIX</div>
+            <input value={pix} onChange={e=>setPix(e.target.value)}
+              placeholder="CPF, e-mail ou telefone"
+              style={{...IS,width:"100%",fontSize:15}}/>
+          </div>
+          <BtnP onClick={()=>setShowConfig(false)} style={{width:"100%",padding:"12px"}}>
+            {crmv||pix ? "✓ Salvo automaticamente" : "Fechar"}
+          </BtnP>
+        </div>
+      </div>}
 
       {/* ============== MODAL HISTORICO ============== */}
       {showHist&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:100,padding:16,overflowY:"auto"}}>
@@ -1287,7 +1494,7 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(AuthWrapper));
 </script>
 <script>
   if('serviceWorker' in navigator){
