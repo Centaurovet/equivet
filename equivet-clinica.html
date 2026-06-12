@@ -81,6 +81,7 @@ const LS3 = "ev_atend_v1";
 const LS_TAGS = "ev_base_tags_v1";
 const LS_CRMV = "ev_crmv_v1";
 const LS_PIX  = "ev_pix_v1";
+const LS_PRECOS = "ev_precos_v1";
 
 // ============================================================================
 // FAIXAS DE REFERENCIA E OPCOES DE EXAME
@@ -426,6 +427,7 @@ function LoginScreen({ onLogin }) {
   const [email,    setEmail]    = useState('');
   const [senha,    setSenha]    = useState('');
   const [modo,     setModo]     = useState('login'); // 'login' | 'cadastro'
+  const [crmvCad,  setCrmvCad]  = useState('');
   const [erro,     setErro]     = useState('');
   const [loading,  setLoading]  = useState(false);
 
@@ -439,7 +441,8 @@ function LoginScreen({ onLogin }) {
 
   const cadastrar = async () => {
     setLoading(true); setErro('');
-    const { data, error } = await supabase.auth.signUp({ email, password: senha });
+    const { data, error } = await supabase.auth.signUp({ email, password: senha,
+      options: { data: { crmv: crmvCad.trim().toUpperCase() } } });
     if (error) setErro(error.message);
     else if (data.user && data.session) onLogin(data.user);
     else setErro('Conta criada! Verifique seu email para confirmar antes de entrar.');
@@ -463,7 +466,8 @@ function LoginScreen({ onLogin }) {
     erro:   { background:'#3a1a1a', border:'1px solid #6a3030', borderRadius:8, padding:'8px 12px', color:'#e08070', fontSize:12, marginTop:4 },
   };
 
-  const ok = !loading && email.includes('@') && senha.length >= 6;
+  const crmvOk = /^[A-Za-z]{2}[\s-]?\d{2,6}$/.test(crmvCad.trim());
+  const ok = !loading && email.includes('@') && senha.length >= 6 && (modo==='login' || crmvOk);
 
   return (
     <div style={S.wrap}>
@@ -487,6 +491,11 @@ function LoginScreen({ onLogin }) {
             onChange={e=>setSenha(e.target.value)}
             onKeyDown={e=>e.key==='Enter' && ok && (modo==='login' ? entrar() : cadastrar())}
             style={S.input} />
+          {modo==='cadastro' && <>
+            <input placeholder="CRMV (UF + número, ex: ES 1234)" value={crmvCad}
+              onChange={e=>setCrmvCad(e.target.value)} style={S.input} />
+            {crmvCad && !crmvOk && <div style={{fontSize:11, color:'#b0905a'}}>Formato: sigla do estado + número (ex: ES 1234)</div>}
+          </>}
           {erro && <div style={S.erro}>{erro}</div>}
           <button onClick={modo==='login' ? entrar : cadastrar} disabled={!ok} style={S.btn(ok)}>
             {loading ? 'Aguarde...' : modo==='login' ? 'Entrar' : 'Criar conta'}
@@ -550,16 +559,18 @@ function App({ user, onLogout }){
   const [novoQ,setNovoQ]     = useState([]);
   const [editTags,setEditTags] = useState([]);
   const [visita,setVisita]   = useState(true);
-  const [vlVisita,setVlVisita] = useState(()=>lsGet("ev_vlvisita_v1",""));
+  const [vlVisita,setVlVisita] = useState(()=>{const p=lsGet(LS_PRECOS,{}); return p.visita!==undefined?p.visita:lsGet("ev_vlvisita_v1","");});
+  const [vlKm,setVlKm]       = useState(()=>lsGet(LS_PRECOS,{}).km||"");
+  const [vlRx,setVlRx]       = useState(()=>lsGet(LS_PRECOS,{}).rx||"");
   const [km,setKm]           = useState("");
   const [rx,setRx]           = useState("");
   const [cirug,setCirug]     = useState(false);
-  const [vlCirug,setVlC]     = useState("2000");
+  const [vlCirug,setVlC]     = useState(()=>lsGet(LS_PRECOS,{}).cirug||"");
   const [descC,setDescC]     = useState("Procedimento cirurgico");
   const [itens,setItens]     = useState([]);
   const [avulso,setAvulso]   = useState({nome:"",valor:""});
   const [copiado,setCopiado] = useState(false);
-  const [crmv,setCrmv]       = useState(()=>lsGet(LS_CRMV,""));
+  const [crmv,setCrmv]       = useState(()=>(user&&user.user_metadata&&user.user_metadata.crmv)||lsGet(LS_CRMV,""));
   const [pix,setPix]         = useState(()=>lsGet(LS_PIX,""));
   const [showConfig,setShowConfig] = useState(false);
 
@@ -632,9 +643,15 @@ function App({ user, onLogout }){
     })();
   },[user]);
   useEffect(()=>{ lsSet(LS_TAGS,baseTags); },[baseTags]);
-  useEffect(()=>{ lsSet(LS_CRMV,crmv); },[crmv]);
+  useEffect(()=>{
+    lsSet(LS_CRMV,crmv);
+    const t=setTimeout(()=>{
+      if(crmv && user && (!user.user_metadata||user.user_metadata.crmv!==crmv))
+        supabase.auth.updateUser({ data:{ crmv } }).then(()=>{},()=>{});
+    },1500);
+    return ()=>clearTimeout(t);
+  },[crmv]);
   useEffect(()=>{ lsSet(LS_PIX,pix); },[pix]);
-  useEffect(()=>{ lsSet("ev_vlvisita_v1",vlVisita); },[vlVisita]);
 
   // Reset de aceitas ao trocar queixa
   useEffect(()=>{ setSugAceitas([]); setVTD(false); },[queixa]);
@@ -656,7 +673,8 @@ function App({ user, onLogout }){
     const hoje = new Date().toLocaleDateString("pt-BR");
     return txt.replace(/\[DATA\]/g,hoje)
       .replace(/\[NOME DO ANIMAL[^\]]*\]/g,paciente||"[NOME DO ANIMAL]")
-      .replace(/\[NOME DO PROPRIETARIO\]/g,prop||"[NOME DO PROPRIETARIO]");
+      .replace(/\[NOME DO PROPRIETARIO\]/g,prop||"[NOME DO PROPRIETARIO]")
+      .replace(/CRMV-\[UF\] \[No\]/g, crmv ? "CRMV-"+crmv : "CRMV-[UF] [No]");
   };
 
   const abrirEditor = p => {
@@ -713,9 +731,11 @@ function App({ user, onLogout }){
 
   // === COBRANCA ===
   const vV = visita?parseFloat(vlVisita)||0:0;
-  const vK = km&&parseFloat(km)>0?parseFloat(km)*1.5:0;
+  const txKm = parseFloat(vlKm)||0;
+  const txRx = parseFloat(vlRx)||0;
+  const vK = km&&parseFloat(km)>0?parseFloat(km)*txKm:0;
   const nR = rx&&parseInt(rx)>0?parseInt(rx):0;
-  const vR = nR*70;
+  const vR = nR*txRx;
   const vC = cirug&&vlCirug?parseFloat(vlCirug):0;
   const total = vV+vK+vR+vC+itens.reduce((a,i)=>a+i.valor*i.qty,0);
 
@@ -729,8 +749,8 @@ function App({ user, onLogout }){
     const hoje=new Date().toLocaleDateString("pt-BR");
     const ls=[];
     if(visita) ls.push("  - Visita clinica: R$ "+(parseFloat(vlVisita)||0).toFixed(2).replace(".",","));
-    if(vK>0)   ls.push("  - Deslocamento ("+parseFloat(km).toFixed(0)+" km x R$ 1,50): R$ "+vK.toFixed(2).replace(".",","));
-    if(vR>0)   ls.push("  - Radiografia"+(nR>1?"s":"")+" ("+nR+" posicao"+(nR>1?"oes":"")+" x R$ 70,00): R$ "+vR.toFixed(2).replace(".",","));
+    if(vK>0)   ls.push("  - Deslocamento ("+parseFloat(km).toFixed(0)+" km x R$ "+txKm.toFixed(2).replace(".",",")+"): R$ "+vK.toFixed(2).replace(".",","));
+    if(vR>0)   ls.push("  - Radiografia"+(nR>1?"s":"")+" ("+nR+" posicao"+(nR>1?"oes":"")+" x R$ "+txRx.toFixed(2).replace(".",",")+"): R$ "+vR.toFixed(2).replace(".",","));
     if(vC>0)   ls.push("  - "+descC+": R$ "+vC.toFixed(2).replace(".",","));
     itens.forEach(i=>ls.push("  - "+i.nome+(i.qty>1?" (x"+i.qty+")":"")+": R$ "+(i.valor*i.qty).toFixed(2).replace(".",",")));
     return "Ola! Segue o atendimento:\n\nPaciente: "+(paciente||"-")+"\nProprietario: "+(prop||"-")+"\nData: "+hoje+"\n\n"+ls.join("\n")+"\n\nTOTAL: R$ "+total.toFixed(2).replace(".",",")+"\n\nChave PIX: "+(pix||"[SEU PIX]")+"\nDr. Ricardo | CRMV-"+(crmv||"[UF] [No]");
@@ -1376,8 +1396,9 @@ function App({ user, onLogout }){
               <div style={{flex:1}}>
                 <div style={{fontSize:12,color:C.muted,marginBottom:4}}>Quilometros</div>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <input type="number" min="0" placeholder="0" value={km} onChange={e=>setKm(e.target.value)} style={{...IS,width:80,fontSize:18,fontWeight:700,textAlign:"center"}}/>
-                  <span style={{fontSize:12,color:C.dim}}>km x R$1,50</span>
+                  <input type="number" min="0" placeholder="0" value={km} onChange={e=>setKm(e.target.value)} style={{...IS,width:70,fontSize:18,fontWeight:700,textAlign:"center"}}/>
+                  <span style={{fontSize:12,color:C.dim}}>km x R$</span>
+                  <input type="number" inputMode="decimal" min="0" placeholder="0,00" value={vlKm} onChange={e=>setVlKm(e.target.value)} style={{...IS,width:70,textAlign:"center"}}/>
                 </div>
               </div>
               <div style={{textAlign:"right"}}>
@@ -1396,7 +1417,8 @@ function App({ user, onLogout }){
                   <button onClick={()=>setRx(v=>Math.max(0,(parseInt(v)||0)-1).toString())} style={{background:"#2a3040",color:C.text,border:"none",borderRadius:6,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>-</button>
                   <input type="number" min="0" placeholder="0" value={rx} onChange={e=>setRx(e.target.value)} style={{...IS,width:60,fontSize:18,fontWeight:700,textAlign:"center"}}/>
                   <button onClick={()=>setRx(v=>((parseInt(v)||0)+1).toString())} style={{background:"#2a3040",color:C.text,border:"none",borderRadius:6,width:32,height:32,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
-                  <span style={{fontSize:12,color:C.dim}}>x R$70</span>
+                  <span style={{fontSize:12,color:C.dim}}>x R$</span>
+                  <input type="number" inputMode="decimal" min="0" placeholder="0,00" value={vlRx} onChange={e=>setVlRx(e.target.value)} style={{...IS,width:70,textAlign:"center"}}/>
                 </div>
               </div>
               <div style={{textAlign:"right"}}>
@@ -1464,7 +1486,7 @@ function App({ user, onLogout }){
             </div>
             <Sec>Mensagem para o cliente</Sec>
             <textarea readOnly value={msg()} style={{...IS,minHeight:210,fontFamily:"'Courier New',monospace",fontSize:12,lineHeight:1.6,marginBottom:8,resize:"vertical"}}/>
-            <BtnP onClick={()=>{copyToClipboard(msg());setCopiado(true);setTimeout(()=>setCopiado(false),2000);}} style={{width:"100%",padding:"12px"}}>
+            <BtnP onClick={()=>{copyToClipboard(msg());lsSet(LS_PRECOS,{visita:vlVisita,km:vlKm,rx:vlRx,cirug:vlCirug});setCopiado(true);setTimeout(()=>setCopiado(false),2000);}} style={{width:"100%",padding:"12px"}}>
               {copiado?"Copiado!":"Copiar mensagem"}
             </BtnP>
           </>}
