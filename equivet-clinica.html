@@ -588,6 +588,49 @@ function App({ user, onLogout }){
   },[]);
 
   useEffect(()=>{ lsSet(LS3,atendimentos); },[atendimentos]);
+
+  // ---- SYNC COM A NUVEM (Supabase) ----
+  const sbParaLocal = r => ({
+    id: r.local_id || "sb_"+r.id,
+    data: r.data_atendimento, paciente: r.paciente_nome||"", prop: r.proprietario_nome||"",
+    queixa: r.queixa, modoExame: r.modo_exame||"focado",
+    anamnese: r.anamnese||{}, exGeral: r.exame_geral||null, mods: r.modulos||null,
+    prontuarioTexto: r.prontuario_texto||"", criadoEm: r.criado_em||new Date().toISOString(),
+  });
+  const chave = a => (a.paciente||a.paciente_nome||"")+"|"+(a.data||a.data_atendimento||"")+"|"+((a.prontuarioTexto||a.prontuario_texto||"").length);
+
+  useEffect(()=>{
+    if(!user) return;
+    (async()=>{
+      try{
+        const { data: rows, error } = await supabase.from('atendimentos')
+          .select('*').eq('veterinario_id', user.id)
+          .order('criado_em',{ascending:false}).limit(500);
+        if(error||!rows){ if(error) console.warn('Sync: leitura falhou:', error.message); return; }
+        const locais = lsGet(LS3,[]);
+        const idsLocais   = new Set(locais.map(a=>a.id));
+        const chavesLocais= new Set(locais.map(chave));
+        const idsNuvem    = new Set(rows.map(r=>r.local_id).filter(Boolean));
+        const chavesNuvem = new Set(rows.map(chave));
+        // nuvem → local (restaura histórico em aparelho novo)
+        const novos = rows.filter(r=>!idsLocais.has(r.local_id||("sb_"+r.id)) && !chavesLocais.has(chave(r))).map(sbParaLocal);
+        if(novos.length){
+          const merged=[...locais,...novos].sort((a,b)=>(b.criadoEm||"").localeCompare(a.criadoEm||""));
+          setAtend(merged);
+        }
+        // local → nuvem (reenvia o que ficou offline)
+        const pendentes = locais.filter(a=>!idsNuvem.has(a.id) && !chavesNuvem.has(chave(a)));
+        for(const a of pendentes){
+          await supabase.from('atendimentos').insert({
+            local_id:a.id, data_atendimento:a.data, paciente_nome:a.paciente,
+            proprietario_nome:a.prop||null, queixa:a.queixa, modo_exame:a.modoExame,
+            anamnese:a.anamnese, exame_geral:a.exGeral, modulos:a.mods,
+            prontuario_texto:a.prontuarioTexto, veterinario_id:user.id });
+        }
+        if(pendentes.length) console.log('Sync: '+pendentes.length+' atendimento(s) reenviado(s) à nuvem.');
+      }catch(e){ console.warn('Sync nuvem indisponível:', e.message); }
+    })();
+  },[user]);
   useEffect(()=>{ lsSet(LS_TAGS,baseTags); },[baseTags]);
   useEffect(()=>{ lsSet(LS_CRMV,crmv); },[crmv]);
   useEffect(()=>{ lsSet(LS_PIX,pix); },[pix]);
@@ -751,6 +794,7 @@ function App({ user, onLogout }){
     setSN(false);
     try {
       const { error } = await supabase.from('atendimentos').insert({
+        local_id:          reg.id,
         data_atendimento:  data,
         paciente_nome:     paciente.trim(),
         proprietario_nome: prop.trim() || null,
@@ -760,7 +804,7 @@ function App({ user, onLogout }){
         exame_geral:       exGeralFinal,
         modulos:           modsFinal,
         prontuario_texto:  prontuarioTexto,
-        veterinario_id:    user?.id || null,
+        veterinario_id:    user.id,
       });
       if(!error){ setSN(true); setTimeout(()=>setSN(false),4000); }
       else { console.warn('Supabase save error:', error.message); }
@@ -791,6 +835,12 @@ function App({ user, onLogout }){
   const excluirHist = id => {
     if(!confirm("Excluir este atendimento do historico?")) return;
     setAtend(atendimentos.filter(a=>a.id!==id));
+    try{
+      const q = String(id).startsWith("sb_")
+        ? supabase.from('atendimentos').delete().eq('id', String(id).slice(3))
+        : supabase.from('atendimentos').delete().eq('local_id', id);
+      q.then(({error})=>{ if(error) console.warn('Excluir na nuvem falhou:', error.message); });
+    }catch(e){ console.warn('Excluir na nuvem indisponível:', e.message); }
   };
 
   const histFiltrado = atendimentos.filter(a=>{
