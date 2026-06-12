@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- EquiVet — cavalo + estetoscópio -->
+  <circle cx="256" cy="256" r="244" fill="#b9dcb9"/>
+
+  <!-- Cabeça do cavalo (traço verde-escuro) -->
+  <g fill="none" stroke="#1e5c40" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <!-- orelha + linha da face até o focinho e mandíbula -->
+    <path d="M211 96
+             C 206 130 204 152 206 170
+             C 178 200 148 248 128 300
+             C 118 327 112 352 122 368
+             C 132 383 152 384 168 374
+             C 182 365 196 362 208 368
+             C 220 374 226 388 226 404"/>
+    <!-- orelha (lado de trás) e crina/pescoço -->
+    <path d="M211 96
+             C 236 112 256 134 264 158
+             C 304 176 332 210 346 252
+             C 356 282 360 314 360 344"/>
+    <!-- pescoço / base -->
+    <path d="M346 470 L 346 386"/>
+    <path d="M256 470 C 256 440 258 420 268 404"/>
+  </g>
+  <!-- olho (folha) -->
+  <path d="M236 232 C 252 224 268 224 278 232 C 270 246 254 252 240 250 C 234 246 233 238 236 232 Z" fill="#1e5c40"/>
+
+  <!-- Estetoscópio -->
+  <!-- hastes claras (periwinkle) -->
+  <g fill="none" stroke="#b9c2e6" stroke-width="26" stroke-linecap="round">
+    <path d="M388 156 C 388 196 392 232 412 252"/>
+    <path d="M470 156 C 470 220 462 268 430 292"/>
+  </g>
+  <!-- olivas (pontas) -->
+  <circle cx="388" cy="142" r="20" fill="#1e3a7a"/>
+  <circle cx="470" cy="142" r="20" fill="#1e3a7a"/>
+  <!-- tubo azul-marinho: desce da junção, faz a curva inferior até o diafragma -->
+  <g fill="none" stroke="#1e3a7a" stroke-width="26" stroke-linecap="round">
+    <path d="M421 262
+             C 434 298 434 336 420 366
+             C 400 408 354 432 308 424
+             C 264 416 232 392 214 398
+             L 196 404"/>
+  </g>
+  <!-- diafragma (peça do peito) -->
+  <circle cx="152" cy="404" r="44" fill="#b9c2e6"/>
+  <circle cx="152" cy="404" r="20" fill="#1e3a7a"/>
+</svg>
