@@ -1,4 +1,4 @@
-// Compilado de JSX — fonte original no histórico do git
+// Compilado de equivet-clinica.src.jsx — edite o .src.jsx e recompile
 // ============================================================================
 // QUEIXAS PRINCIPAIS
 // ============================================================================
@@ -781,6 +781,16 @@ function Vital({
 // ============================================================================
 // TELA DE LOGIN
 // ============================================================================
+function traduzErroAuth(m) {
+  if (!m) return 'Erro desconhecido. Tente novamente.';
+  if (/already registered|already exists/i.test(m)) return 'Este email já tem conta. Use a aba "Entrar".';
+  if (/at least 6|password.*short|weak password/i.test(m)) return 'A senha precisa de pelo menos 6 caracteres.';
+  if (/rate limit|too many|security purposes/i.test(m)) return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
+  if (/invalid email|unable to validate email/i.test(m)) return 'Email inválido. Confira a digitação.';
+  if (/email not confirmed/i.test(m)) return 'Email ainda não confirmado. Verifique sua caixa de entrada.';
+  if (/failed to fetch|network/i.test(m)) return 'Sem conexão. Verifique a internet e tente de novo.';
+  return m;
+}
 function LoginScreen({
   onLogin
 }) {
@@ -800,7 +810,7 @@ function LoginScreen({
       email,
       password: senha
     });
-    if (error) setErro('Email ou senha incorretos.');else onLogin(data.user);
+    if (error) setErro(/failed to fetch|network/i.test(error.message || '') ? 'Sem conexão. Verifique a internet.' : 'Email ou senha incorretos.');else onLogin(data.user);
     setLoading(false);
   };
   const cadastrar = async () => {
@@ -818,7 +828,7 @@ function LoginScreen({
         }
       }
     });
-    if (error) setErro(error.message);else if (data.user && data.session) onLogin(data.user);else setErro('Conta criada! Verifique seu email para confirmar antes de entrar.');
+    if (error) setErro(traduzErroAuth(error.message));else if (data.user && data.session) onLogin(data.user);else setErro('Conta criada! Verifique seu email para confirmar antes de entrar.');
     setLoading(false);
   };
   const S = {
@@ -1090,6 +1100,12 @@ function App({
   const [filtroAte, setFiltroAte] = useState("");
   const [verTodosDiag, setVTD] = useState(false);
   const [atendSalvo, setAS] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const [confirma, setConfirma] = useState(null); // {msg, acao}
+  const avisar = m => {
+    setAviso(m);
+    setTimeout(() => setAviso(""), 3500);
+  };
   const [salvoNuvem, setSN] = useState(false); // true = gravado no Supabase
 
   useEffect(() => {
@@ -1139,7 +1155,7 @@ function App({
         // nuvem → local (restaura histórico em aparelho novo)
         const novos = rows.filter(r => !idsLocais.has(r.local_id || "sb_" + r.id) && !chavesLocais.has(chave(r))).map(sbParaLocal);
         if (novos.length) {
-          const merged = [...locais, ...novos].sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
+          const merged = [...locais, ...novos].sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || "")).slice(0, 500);
           setAtend(merged);
         }
         // local → nuvem (reenvia o que ficou offline)
@@ -1371,11 +1387,11 @@ function App({
   // === SALVAR ATENDIMENTO ===
   const salvarAtendimento = async () => {
     if (!paciente.trim()) {
-      alert("Informe o nome do animal no cabecalho.");
+      avisar("Informe o nome do animal no cabecalho.");
       return;
     }
     if (!queixa) {
-      alert("Selecione uma queixa principal.");
+      avisar("Selecione uma queixa principal.");
       return;
     }
     const prontuarioTexto = buildProntuario({
@@ -1409,7 +1425,7 @@ function App({
       prontuarioTexto,
       criadoEm: new Date().toISOString()
     };
-    setAtend([reg, ...atendimentos]);
+    setAtend([reg, ...atendimentos].slice(0, 500));
     setAS(true);
     setTimeout(() => setAS(false), 4000);
 
@@ -1443,28 +1459,30 @@ function App({
       console.warn('Supabase offline, dado salvo só localmente:', e.message);
     }
   };
-  const limparAtendimento = () => {
-    if (!confirm("Limpar formulario de atendimento atual? (paciente/proprietario do cabecalho serao mantidos)")) return;
-    setQueixa("");
-    setModoExame("focado");
-    setAnamnese({
-      inicio: "",
-      evolucao: "",
-      manejoRecente: "",
-      vermifugacao: "",
-      vacinacao: "",
-      alimentacao: "",
-      obs: ""
-    });
-    setExGeral({
-      ...EX_GERAL_INIT,
-      motilidade: {
-        ...EX_GERAL_INIT.motilidade
-      }
-    });
-    setMods(JSON.parse(JSON.stringify(MOD_INIT)));
-    setSugAceitas([]);
-  };
+  const limparAtendimento = () => setConfirma({
+    msg: "Limpar o formulario de atendimento atual? (paciente e proprietario do cabecalho serao mantidos)",
+    acao: () => {
+      setQueixa("");
+      setModoExame("focado");
+      setAnamnese({
+        inicio: "",
+        evolucao: "",
+        manejoRecente: "",
+        vermifugacao: "",
+        vacinacao: "",
+        alimentacao: "",
+        obs: ""
+      });
+      setExGeral({
+        ...EX_GERAL_INIT,
+        motilidade: {
+          ...EX_GERAL_INIT.motilidade
+        }
+      });
+      setMods(JSON.parse(JSON.stringify(MOD_INIT)));
+      setSugAceitas([]);
+    }
+  });
   const carregarHist = a => {
     setData(a.data);
     setPac(a.paciente);
@@ -1488,20 +1506,22 @@ function App({
     if (a.mods) setMods(JSON.parse(JSON.stringify(a.mods)));
     setShowHist(false);
   };
-  const excluirHist = id => {
-    if (!confirm("Excluir este atendimento do historico?")) return;
-    setAtend(atendimentos.filter(a => a.id !== id));
-    try {
-      const q = String(id).startsWith("sb_") ? supabase.from('atendimentos').delete().eq('id', String(id).slice(3)) : supabase.from('atendimentos').delete().eq('local_id', id);
-      q.then(({
-        error
-      }) => {
-        if (error) console.warn('Excluir na nuvem falhou:', error.message);
-      });
-    } catch (e) {
-      console.warn('Excluir na nuvem indisponível:', e.message);
+  const excluirHist = id => setConfirma({
+    msg: "Excluir este atendimento do historico? (sera removido tambem da nuvem)",
+    acao: () => {
+      setAtend(atendimentos.filter(a => a.id !== id));
+      try {
+        const q = String(id).startsWith("sb_") ? supabase.from('atendimentos').delete().eq('id', String(id).slice(3)) : supabase.from('atendimentos').delete().eq('local_id', id);
+        q.then(({
+          error
+        }) => {
+          if (error) console.warn('Excluir na nuvem falhou:', error.message);
+        });
+      } catch (e) {
+        console.warn('Excluir na nuvem indisponível:', e.message);
+      }
     }
-  };
+  });
   const histFiltrado = atendimentos.filter(a => {
     if (filtroPac && !a.paciente.toLowerCase().includes(filtroPac.toLowerCase())) return false;
     if (filtroDe && a.data < filtroDe) return false;
@@ -4377,7 +4397,89 @@ function App({
       width: "100%",
       padding: "12px"
     }
-  }, copiado ? "Copiado!" : "Copiar mensagem")))), showConfig && /*#__PURE__*/React.createElement("div", {
+  }, copiado ? "Copiado!" : "Copiar mensagem")))), aviso && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      bottom: 20,
+      left: "50%",
+      transform: "translateX(-50%)",
+      background: "#3a2a1a",
+      border: "1px solid #d4a96a",
+      color: "#e8d0a0",
+      padding: "10px 18px",
+      borderRadius: 10,
+      fontSize: 13,
+      zIndex: 300,
+      maxWidth: "90%",
+      textAlign: "center",
+      boxShadow: "0 4px 16px #000a"
+    }
+  }, aviso), confirma && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "fixed",
+      inset: 0,
+      background: "#000a",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 310,
+      padding: 20
+    },
+    onClick: () => setConfirma(null)
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: "#15192a",
+      border: "1px solid #2a3040",
+      borderRadius: 14,
+      padding: 22,
+      maxWidth: 340,
+      width: "100%"
+    },
+    onClick: e => e.stopPropagation()
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      lineHeight: 1.5,
+      color: C.text,
+      marginBottom: 18
+    }
+  }, confirma.msg), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setConfirma(null),
+    style: {
+      flex: 1,
+      background: "#2a3040",
+      color: C.muted,
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      fontSize: 14,
+      cursor: "pointer",
+      fontFamily: "Georgia,serif"
+    }
+  }, "Cancelar"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const a = confirma.acao;
+      setConfirma(null);
+      a();
+    },
+    style: {
+      flex: 1,
+      background: "#c0654a",
+      color: "#fff",
+      border: "none",
+      borderRadius: 8,
+      padding: "10px",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer",
+      fontFamily: "Georgia,serif"
+    }
+  }, "Confirmar")))), showConfig && /*#__PURE__*/React.createElement("div", {
     style: {
       position: "fixed",
       inset: 0,

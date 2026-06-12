@@ -1,4 +1,4 @@
-const CACHE = "equivet-v8";
+const CACHE = "equivet-v9";
 const FILES = [
   "./",
   "./index.html",
