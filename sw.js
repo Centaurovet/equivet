@@ -1,8 +1,9 @@
-const CACHE = "equivet-v7";
+const CACHE = "equivet-v8";
 const FILES = [
   "./",
   "./index.html",
   "./equivet-clinica.html",
+  "./equivet-clinica.js",
   "./equivet-uti.html",
   "./manifest-clinica.json",
   "./manifest-uti.json",
@@ -20,7 +21,8 @@ const FILES = [
 self.addEventListener("install", e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(FILES))
+      // allSettled: a falha de um arquivo (ex.: CDN fora do ar) nao impede a instalacao
+      .then(c => Promise.allSettled(FILES.map(f => c.add(f))))
       .then(() => self.skipWaiting())
   );
 });
