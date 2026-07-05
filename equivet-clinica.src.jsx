@@ -16,22 +16,17 @@ const QUEIXAS = [
 // ============================================================================
 // TEMPLATES BASE - agora com tags de queixa
 // ============================================================================
+const NOVO_TPL = (t) => "PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: " + t + "\n\nMEDICAMENTOS:\n1. [MEDICAMENTO]\n   Dose: [DOSE]\n   Via: [VO / IM / IV]\n   Duracao: [X dias]\n\nMEDIDAS DE SUPORTE:\n- [OBSERVACAO]\n\nDr. Ricardo | CRMV-[UF] [No]";
+
 const BASE = [
-  { id:1, titulo:"Laminite Aguda", categoria:"Ortopedia", icon:"🦵", queixas:["claudic"],
-    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Laminite Aguda\n\nMEDICAMENTOS:\n1. Fenilbutazona 1g/comprimido\n   Dose: 4,4 mg/kg VO, 2x/dia por 5 dias\n\n2. Omeprazol equino 2,28 g\n   Dose: 1 sache VO, 1x/dia por 7 dias\n   (protecao gastrica durante AINE)\n\n3. DMSO gel\n   Aplicar nas muralhas dos cascos 2x/dia por 7 dias\n\nSUPORTE:\n- Baia com cama funda de areia\n- Gelo nas muralhas 20 min, 3x/dia por 3 dias\n- Casqueamento corretivo em 48-72h\n- Radiografia de navicular indicada\n\nDr. Ricardo | CRMV-[UF] [No]" },
-  { id:2, titulo:"Colica Espamodica", categoria:"Gastroenterologia", icon:"🫁", queixas:["colica"],
-    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Colica Espamodica\n\nTRATAMENTO EM CAMPO:\n- Dipirona sodica 50% - 30 mL IV lento\n- Buscopan - 20 mL IV lento\n- Flunixina meglumina 50 mg/mL - 1,1 mg/kg IV\n\nPOS-ATENDIMENTO:\n1. Dipirona oral 500 mg/mL - 20 mL VO a cada 8h, ate 3 dias\n2. Probiotico equino - 1 sache/dia VO por 7 dias\n\nOBSERVACOES:\n- Jejum por 2h apos melhora\n- Ligar imediatamente se dor nao cede em 1h\n\nDr. Ricardo | CRMV-[UF] [No]" },
-  { id:3, titulo:"Hernia Umbilical", categoria:"Cirurgia", icon:"🐴", queixas:[],
-    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Hernia Umbilical nao complicada\n\nPRE-PROCEDIMENTO:\n1. Xilazina 10% - 0,5-1 mg/kg IM\n2. Lidocaina 2% - infiltracao local\n\nPOS-PROCEDIMENTO:\n1. Penicilina G Benzatina 300.000 UI/mL - 22.000 UI/kg IM, dose unica\n2. Flunixina meglumina 50 mg/mL - 1,1 mg/kg IM, 1x/dia por 3 dias\n\nCUIDADOS:\n- Inspecionar anel diariamente\n- Queda espontanea em 7-15 dias\n- Alerta: febre, dor intensa, odor fetido\n\nDr. Ricardo | CRMV-[UF] [No]" },
-  { id:4, titulo:"Leptospirose Equina", categoria:"Infectologia", icon:"🔬", queixas:[],
-    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Leptospirose Equina (sorovar [ICTEROHAEMORRHAGIAE / outro])\n\nTRATAMENTO:\n1. Penicilina G Procaina 300.000 UI/mL - 22.000 UI/kg IM, 2x/dia por 7 dias\nOU\n1. Oxitetraciclina 200 mg/mL - 6,6 mg/kg IV lento em SF 0,9%, 1x/dia por 5 dias\n\nSUPORTE:\n2. Ringer com Lactato - 10-20 L IV/dia por 3 dias\n3. Flunixina meglumina - 1,1 mg/kg IV 1x/dia por 3 dias\n4. Vitamina B12 - 1 mL/100kg IM, 3x/semana por 2 semanas\n\nMANEJO DO PLANTEL:\n- Vacinar com Lexington 8 (D0, D28, reforco anual)\n- Controle de roedores e fontes d'agua\n\nDr. Ricardo | CRMV-[UF] [No]" },
-  { id:5, titulo:"Ferida / Laceracao", categoria:"Cirurgia", icon:"🩹", queixas:["dermato"],
-    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: Laceracao - [LOCALIZACAO]\n\nTRATAMENTO EM CAMPO:\n- Limpeza com SF 0,9%\n- Desbridamento\n- Sutura: [sim/nao] - [tipo]\n\nMEDICAMENTOS:\n1. Penicilina G Benzatina - 22.000 UI/kg IM a cada 48h por 3 aplicacoes\n2. Flunixina meglumina - 1,1 mg/kg IM 1x/dia por 5 dias\n3. Spray cicatrizante - 2x/dia apos limpeza\n\nCURATIVO: Clorexidina 0,2% 1x/dia, oclusivo trocado diariamente\nSORO ANTITETANICO: [APLICADO / APLICAR - 5.000 UI IM]\n\nDr. Ricardo | CRMV-[UF] [No]" },
-  { id:6, titulo:"Conjuntivite / Uveite", categoria:"Oftalmologia", icon:"👁️", queixas:["oftalmo"],
-    template:"PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: [Conjuntivite Bacteriana / Uveite Equina Recorrente]\n\nMEDICAMENTOS OCULARES:\n1. Colirio Neomicina + Polimixina B + Dexametasona\n   2 gotas, 3x/dia por 7 dias (somente se ulcera descartada)\n2. Atropina 1% colirio - 1 gota, 2x/dia por 5 dias (somente em uveite)\n\nSISTEMICO:\n3. Flunixina meglumina - 1,1 mg/kg IM 1x/dia por 5 dias\n\nCUIDADOS:\n- Manter em local sombreado\n- Nao usar corticoide sem descartar ulcera\n\nDr. Ricardo | CRMV-[UF] [No]" },
+  { id:1, titulo:"Laminite Aguda",       categoria:"Ortopedia",         icon:"🦵", queixas:["claudic"], template:NOVO_TPL("Laminite Aguda") },
+  { id:2, titulo:"Colica Espamodica",    categoria:"Gastroenterologia", icon:"🫁", queixas:["colica"],  template:NOVO_TPL("Colica Espamodica") },
+  { id:3, titulo:"Hernia Umbilical",     categoria:"Cirurgia",          icon:"🐴", queixas:[],          template:NOVO_TPL("Hernia Umbilical") },
+  { id:4, titulo:"Leptospirose Equina",  categoria:"Infectologia",      icon:"🔬", queixas:[],          template:NOVO_TPL("Leptospirose Equina") },
+  { id:5, titulo:"Ferida / Laceracao",   categoria:"Cirurgia",          icon:"🩹", queixas:["dermato"], template:NOVO_TPL("Laceracao - [LOCALIZACAO]") },
+  { id:6, titulo:"Conjuntivite / Uveite",categoria:"Oftalmologia",      icon:"👁️", queixas:["oftalmo"], template:NOVO_TPL("[Conjuntivite / Uveite]") },
 ];
 
-const NOVO_TPL = (t) => "PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: " + t + "\n\nMEDICAMENTOS:\n1. [MEDICAMENTO]\n   Dose: [DOSE]\n   Via: [VO / IM / IV]\n   Duracao: [X dias]\n\nMEDIDAS DE SUPORTE:\n- [OBSERVACAO]\n\nDr. Ricardo | CRMV-[UF] [No]";
 
 const ICONS = ["🐎","🦵","🫁","🐴","🔬","🩹","👁️","💉","🦷","🫀","🧬","🩻","🌡️","💊","🧪","🏥"];
 const CATS  = ["Clinica Geral","Ortopedia","Gastroenterologia","Cirurgia","Infectologia","Oftalmologia","Reproducao","Neurologia"];
@@ -42,6 +37,9 @@ const LS_TAGS = "ev_base_tags_v1";
 const LS_CRMV = "ev_crmv_v1";
 const LS_PIX  = "ev_pix_v1";
 const LS_PRECOS = "ev_precos_v1";
+
+// Backend Railway (mesmo do chat). /literatura autentica via JWT do usuario (Supabase).
+const BACKEND_URL = "https://web-production-2f5bf.up.railway.app";
 
 // ============================================================================
 // FAIXAS DE REFERENCIA E OPCOES DE EXAME
@@ -420,6 +418,17 @@ function LoginScreen({ onLogin }) {
     setLoading(false);
   };
 
+  const [resetMsg, setResetMsg] = useState('');
+  const redefinir = async () => {
+    if (!email.includes('@')) { setErro('Digite seu email no campo acima para redefinir a senha.'); return; }
+    setLoading(true); setErro(''); setResetMsg('');
+    const redirect = window.location.origin + window.location.pathname;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirect });
+    if (error) setErro(traduzErroAuth(error.message));
+    else setResetMsg('Enviamos um link de redefinicao para ' + email + '. Verifique seu email (e a caixa de spam).');
+    setLoading(false);
+  };
+
   const S = {
     wrap:   { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0f1117', padding:20 },
     card:   { background:'#15192a', border:'1px solid #2a3040', borderRadius:16, padding:32, width:'100%', maxWidth:360 },
@@ -468,9 +477,16 @@ function LoginScreen({ onLogin }) {
             {crmvCad && !crmvOk && <div style={{fontSize:11, color:'#b0905a'}}>Formato: sigla do estado + número (ex: ES 1234)</div>}
           </>}
           {erro && <div style={S.erro}>{erro}</div>}
+          {resetMsg && <div style={{background:'#1a2e1a', border:'1px solid #3a6a3a', borderRadius:8, padding:'8px 12px', color:'#8ac888', fontSize:12, marginTop:4}}>{resetMsg}</div>}
           <button onClick={modo==='login' ? entrar : cadastrar} disabled={!ok} style={S.btn(ok)}>
             {loading ? 'Aguarde...' : modo==='login' ? 'Entrar' : 'Criar conta'}
           </button>
+          {modo==='login' && (
+            <button onClick={redefinir} disabled={loading}
+              style={{background:'none', border:'none', color:'#6a7090', fontSize:12, fontFamily:'Georgia,serif', cursor:loading?'default':'pointer', textDecoration:'underline', marginTop:8, padding:0}}>
+              Esqueci minha senha
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -483,13 +499,15 @@ function LoginScreen({ onLogin }) {
 function AuthWrapper() {
   const [user,     setUser]     = useState(null);
   const [checando, setChecando] = useState(true);
+  const [recuperar,setRecuperar]= useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setChecando(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setRecuperar(true);
       setUser(session?.user ?? null);
     });
     return () => subscription.unsubscribe();
@@ -501,9 +519,68 @@ function AuthWrapper() {
     </div>
   );
 
+  if (recuperar) return <NovaSenhaScreen onDone={()=>setRecuperar(false)} />;
+
   if (!user) return <LoginScreen onLogin={setUser} />;
 
   return <App user={user} onLogout={()=>supabase.auth.signOut()} />;
+}
+
+// ============================================================================
+// TELA DE NOVA SENHA — apos clicar no link de redefinicao recebido por email
+// ============================================================================
+function NovaSenhaScreen({ onDone }) {
+  const [senha,   setSenha]   = useState('');
+  const [senha2,  setSenha2]  = useState('');
+  const [erro,    setErro]    = useState('');
+  const [ok,      setOk]      = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const salvar = async () => {
+    if (senha.length < 6) { setErro('A senha deve ter no minimo 6 caracteres.'); return; }
+    if (senha !== senha2) { setErro('As senhas nao coincidem.'); return; }
+    setLoading(true); setErro('');
+    const { error } = await supabase.auth.updateUser({ password: senha });
+    if (error) { setErro(traduzErroAuth(error.message)); setLoading(false); return; }
+    setOk(true); setLoading(false);
+    setTimeout(() => { supabase.auth.signOut().then(()=>onDone()); }, 2200);
+  };
+
+  const S = {
+    wrap:  { minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#0f1117', padding:20 },
+    card:  { background:'#15192a', border:'1px solid #2a3040', borderRadius:16, padding:32, width:'100%', maxWidth:360 },
+    input: { background:'#0f1320', border:'1px solid #2a3040', borderRadius:8, padding:'10px 12px', color:'#e8e0d0', fontSize:14, width:'100%', fontFamily:'Georgia,serif' },
+    btn:   (a)=>({ background:a?'#d4a96a':'#2a3040', color:a?'#1a1510':'#4a5060', border:'none', borderRadius:8, padding:'12px', fontSize:15, fontWeight:700, cursor:a?'pointer':'default', fontFamily:'Georgia,serif', width:'100%', marginTop:4 }),
+    erro:  { background:'#3a1a1a', border:'1px solid #6a3030', borderRadius:8, padding:'8px 12px', color:'#e08070', fontSize:12, marginTop:4 },
+    good:  { background:'#1a2e1a', border:'1px solid #3a6a3a', borderRadius:8, padding:'8px 12px', color:'#8ac888', fontSize:12, marginTop:4 },
+  };
+  const valido = !loading && senha.length >= 6 && senha === senha2;
+
+  return (
+    <div style={S.wrap}>
+      <div style={S.card}>
+        <div style={{textAlign:'center', marginBottom:24}}>
+          <div style={{fontSize:40, marginBottom:8}}>🔑</div>
+          <div style={{fontSize:18, fontWeight:700, color:'#d4a96a'}}>Definir nova senha</div>
+        </div>
+        {ok ? (
+          <div style={S.good}>Senha redefinida com sucesso! Faca login com a nova senha.</div>
+        ) : (
+          <div style={{display:'flex', flexDirection:'column', gap:10}}>
+            <input type="password" placeholder="Nova senha (minimo 6 caracteres)" value={senha}
+              onChange={e=>setSenha(e.target.value)} style={S.input} />
+            <input type="password" placeholder="Confirmar nova senha" value={senha2}
+              onChange={e=>setSenha2(e.target.value)}
+              onKeyDown={e=>e.key==='Enter' && valido && salvar()} style={S.input} />
+            {erro && <div style={S.erro}>{erro}</div>}
+            <button onClick={salvar} disabled={!valido} style={S.btn(valido)}>
+              {loading ? 'Salvando...' : 'Salvar nova senha'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ============================================================================
@@ -564,6 +641,48 @@ function App({ user, onLogout }){
   const [confirma,setConfirma]    = useState(null); // {msg, acao}
   const avisar = m => { setAviso(m); setTimeout(()=>setAviso(""),3500); };
   const [salvoNuvem,setSN]        = useState(false); // true = gravado no Supabase
+
+  // ---- LITERATURA (consulta RAG ao backend) ----
+  const [litPergunta,setLitP]     = useState("");
+  const [litResposta,setLitR]     = useState("");
+  const [litTemLit,setLitTL]      = useState(false);
+  const [litLoading,setLitL]      = useState(false);
+  const [litErro,setLitE]         = useState("");
+  const [litUsarCtx,setLitCtx]    = useState(true);
+
+  async function consultarLiteratura(){
+    const pergunta = litPergunta.trim();
+    if(!pergunta){ setLitE("Digite uma pergunta."); return; }
+    setLitL(true); setLitE(""); setLitR(""); setLitTL(false);
+    try{
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session && session.access_token;
+      if(!token){ setLitE("Sessao expirada. Faca login novamente."); setLitL(false); return; }
+      let contexto = "";
+      if(litUsarCtx){
+        const partes = [];
+        if(paciente) partes.push("Paciente: "+paciente);
+        const q = QUEIXAS.find(x=>x.id===queixa);
+        if(q) partes.push("Queixa principal: "+q.label);
+        const pront = buildProntuario({queixa,modoExame,anamnese,exGeral,mods});
+        if(pront) partes.push(pront);
+        contexto = partes.join("\n");
+      }
+      const res = await fetch(BACKEND_URL+"/literatura",{
+        method:"POST",
+        headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+token },
+        body: JSON.stringify({ pergunta, contexto: contexto||null })
+      });
+      if(!res.ok){
+        const t = await res.text().catch(()=>"");
+        setLitE("Erro "+res.status+(t?": "+t.slice(0,160):"")); setLitL(false); return;
+      }
+      const json = await res.json();
+      setLitR(json.resposta||"(sem resposta)");
+      setLitTL(!!json.tem_literatura);
+    }catch(e){ setLitE("Falha de conexao com o servidor."); }
+    setLitL(false);
+  }
 
   useEffect(()=>{
     setCustom(lsGet(LS1,{}));
@@ -920,7 +1039,7 @@ function App({ user, onLogout }){
           <input placeholder="Proprietario" value={prop} onChange={e=>setProp(e.target.value)} style={{...IS,width:"auto",flex:1,minWidth:140,fontSize:13}}/>
         </div>
         <div style={{display:"flex",overflowX:"auto"}}>
-          {[["atendimento","Atendimento"],["prescricoes","Prescricoes"],["cobranca","Cobranca"]].map(([a,l])=>(
+          {[["atendimento","Atendimento"],["prescricoes","Prescricoes"],["cobranca","Cobranca"],["literatura","Literatura"]].map(([a,l])=>(
             <button key={a} onClick={()=>{setAba(a);if(a!=="prescricoes")setTela("lista");}} style={{background:aba===a?C.gold:"transparent",color:aba===a?"#0f1117":C.muted,border:"none",padding:"8px 16px",cursor:"pointer",fontSize:12,fontWeight:700,textTransform:"uppercase",borderRadius:"6px 6px 0 0",whiteSpace:"nowrap"}}>{l}</button>
           ))}
         </div>
@@ -1466,6 +1585,42 @@ function App({ user, onLogout }){
               {copiado?"Copiado!":"Copiar mensagem"}
             </BtnP>
           </>}
+        </div>}
+
+        {/* ====================== LITERATURA ====================== */}
+        {aba==="literatura"&&<div>
+          <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:14,marginBottom:12}}>
+            <div style={{fontSize:13,fontWeight:700,color:C.gold,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>📖 Consulta a literatura</div>
+            <div style={{fontSize:12,color:C.dim,lineHeight:1.6,marginBottom:12}}>
+              Busca nas referencias indexadas (Smith — Large Animal Surgery e Adams — Claudicacion) e responde com citacoes [Livro, p.X]. Complementa com busca na web quando necessario.
+            </div>
+            <textarea value={litPergunta} onChange={e=>setLitP(e.target.value)}
+              placeholder="Ex: Qual o protocolo de tratamento para laminite aguda? Diferenciais de claudicacao de membro anterior?"
+              style={{width:"100%",minHeight:90,background:"#121620",border:"1px solid "+C.bord,borderRadius:8,color:C.text,fontFamily:"Georgia,serif",fontSize:14,lineHeight:1.6,padding:12,resize:"vertical",boxSizing:"border-box",outline:"none",marginBottom:10}}/>
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,color:C.muted,marginBottom:12,cursor:"pointer"}}>
+              <input type="checkbox" checked={litUsarCtx} onChange={e=>setLitCtx(e.target.checked)} style={{accentColor:C.gold,width:16,height:16}}/>
+              Enviar dados do atendimento atual como contexto (paciente, queixa, anamnese, exame)
+            </label>
+            <BtnP onClick={consultarLiteratura} disabled={litLoading} style={{width:"100%",padding:"12px",opacity:litLoading?0.6:1}}>
+              {litLoading ? "Consultando…" : "Consultar literatura"}
+            </BtnP>
+            {litErro&&<div style={{marginTop:10,background:"#2e1a1a",border:"1px solid #6a3a3a",borderRadius:8,padding:"10px 12px",fontSize:13,color:"#e0a0a0"}}>{litErro}</div>}
+          </div>
+          {litResposta&&<div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:16,marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontSize:11,fontWeight:700,color:litTemLit?C.green:C.amber,textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                {litTemLit ? "✓ Com base na literatura indexada" : "⚠ Sem trecho relevante na literatura — resposta geral"}
+              </div>
+              <button onClick={()=>{copyToClipboard(litResposta);setCopiado(true);setTimeout(()=>setCopiado(false),2000);}}
+                style={{background:"transparent",border:"1px solid "+C.bord,borderRadius:6,padding:"4px 10px",color:C.gold,fontSize:11,cursor:"pointer",fontFamily:"Georgia,serif"}}>
+                {copiado?"Copiado!":"Copiar"}
+              </button>
+            </div>
+            <div style={{whiteSpace:"pre-wrap",fontSize:14,lineHeight:1.7,color:C.text}}>{litResposta}</div>
+          </div>}
+          <div style={{fontSize:11,color:C.dim,lineHeight:1.6,padding:"0 4px"}}>
+            Ferramenta de apoio a decisao. Sempre valide contra o exame clinico presencial.
+          </div>
         </div>}
 
       </div>
