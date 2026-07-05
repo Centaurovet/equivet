@@ -1,4 +1,4 @@
-const CACHE = "equivet-v10";
+const CACHE = "equivet-v11";
 const FILES = [
   "./",
   "./index.html",
@@ -44,8 +44,13 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
 
-  // Supabase e outras APIs externas: tenta rede, ignora offline
-  if (url.hostname.includes("supabase.co") || url.hostname.includes("anthropic.com")) {
+  // APIs (Supabase, backend Railway) e QUALQUER requisicao nao-GET (POST/PUT/...):
+  // rede-primeiro, NUNCA cache nem fallback de HTML. Evita servir index.html numa
+  // chamada de API que demora/falha (o app faria res.json() num HTML e quebraria).
+  if (e.request.method !== "GET"
+      || url.hostname.includes("supabase.co")
+      || url.hostname.includes("anthropic.com")
+      || url.hostname.includes("railway.app")) {
     e.respondWith(
       fetch(e.request).catch(() => new Response(
         JSON.stringify({error: "offline"}),

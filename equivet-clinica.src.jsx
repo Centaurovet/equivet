@@ -1592,7 +1592,7 @@ function App({ user, onLogout }){
           <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:14,marginBottom:12}}>
             <div style={{fontSize:13,fontWeight:700,color:C.gold,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>📖 Consulta a literatura</div>
             <div style={{fontSize:12,color:C.dim,lineHeight:1.6,marginBottom:12}}>
-              Busca nas referencias indexadas (Smith — Large Animal Surgery e Adams — Claudicacion) e responde com citacoes [Livro, p.X]. Complementa com busca na web quando necessario.
+              Busca nas referencias indexadas (Smith — Large Animal Surgery e Adams — Claudicacion) e responde com citacoes [Livro, p.X].
             </div>
             <textarea value={litPergunta} onChange={e=>setLitP(e.target.value)}
               placeholder="Ex: Qual o protocolo de tratamento para laminite aguda? Diferenciais de claudicacao de membro anterior?"

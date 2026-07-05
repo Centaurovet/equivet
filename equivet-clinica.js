@@ -1592,7 +1592,7 @@ function App({ user, onLogout }) {
         aba === "literatura" && /*#__PURE__*/_jsxDEV("div", { children: [/*#__PURE__*/
           _jsxDEV("div", { style: { background: C.card, border: "1px solid " + C.bord, borderRadius: 10, padding: 14, marginBottom: 12 }, children: [/*#__PURE__*/
             _jsxDEV("div", { style: { fontSize: 13, fontWeight: 700, color: C.gold, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }, children: "📖 Consulta a literatura" }, void 0, false), /*#__PURE__*/
-            _jsxDEV("div", { style: { fontSize: 12, color: C.dim, lineHeight: 1.6, marginBottom: 12 }, children: "Busca nas referencias indexadas (Smith — Large Animal Surgery e Adams — Claudicacion) e responde com citacoes [Livro, p.X]. Complementa com busca na web quando necessario." }, void 0, false
+            _jsxDEV("div", { style: { fontSize: 12, color: C.dim, lineHeight: 1.6, marginBottom: 12 }, children: "Busca nas referencias indexadas (Smith — Large Animal Surgery e Adams — Claudicacion) e responde com citacoes [Livro, p.X]." }, void 0, false
 
             ), /*#__PURE__*/
             _jsxDEV("textarea", { value: litPergunta, onChange: (e) => setLitP(e.target.value),
