@@ -20,7 +20,7 @@ const QUEIXAS = [
 const NOVO_TPL = (t) => "PRESCRICAO VETERINARIA\n\nPaciente: [NOME DO ANIMAL]\nProprietario: [NOME DO PROPRIETARIO]\nData: [DATA]\n\nDIAGNOSTICO: " + t + "\n\nMEDICAMENTOS:\n1. [MEDICAMENTO]\n   Dose: [DOSE]\n   Via: [VO / IM / IV]\n   Duracao: [X dias]\n\nMEDIDAS DE SUPORTE:\n- [OBSERVACAO]\n\nDr. Ricardo | CRMV-[UF] [No]";
 
 const BASE = [
-{ id: 1, titulo: "Laminite Aguda", categoria: "Ortopedia", icon: "🦵", queixas: ["claudic"], template: NOVO_TPL("Laminite Aguda") },
+{ id: 1, titulo: "Laminite Aguda", categoria: "Ortopedia", icon: "__hoof__", queixas: ["claudic"], template: NOVO_TPL("Laminite Aguda") },
 { id: 2, titulo: "Colica Espamodica", categoria: "Gastroenterologia", icon: "🫁", queixas: ["colica"], template: NOVO_TPL("Colica Espamodica") },
 { id: 3, titulo: "Hernia Umbilical", categoria: "Cirurgia", icon: "🐴", queixas: [], template: NOVO_TPL("Hernia Umbilical") },
 { id: 4, titulo: "Leptospirose Equina", categoria: "Infectologia", icon: "🔬", queixas: [], template: NOVO_TPL("Leptospirose Equina") },
@@ -30,6 +30,13 @@ const BASE = [
 
 
 const ICONS = ["🐎", "🦵", "🫁", "🐴", "🔬", "🩹", "👁️", "💉", "🦷", "🫀", "🧬", "🩻", "🌡️", "💊", "🧪", "🏥"];
+
+const HOOF_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"><path fill="#d4a96a" fill-rule="evenodd" d="M12 2.5c5.2 0 8.7 4.3 8.7 9.5S17.2 21.5 12 21.5 3.3 17.2 3.3 12 6.8 2.5 12 2.5Zm0 3C8.5 5.5 6.3 8.6 6.3 12S8.7 18.5 12 18.5 17.7 15.4 17.7 12 15.5 5.5 12 5.5Z"/><path fill="#d4a96a" d="M12 7.6l2.5 6.5c.2.6-.2 1.1-.8 1.1h-3.4c-.6 0-1-.5-.8-1.1L12 7.6Z"/></svg>';
+// Renderiza SVG quando o icone e um marcador especial; senao mostra o emoji normal.
+const renderIcon = (ic) => ic === "__hoof__" ? /*#__PURE__*/
+React.createElement("span", { style: { display: "inline-block", verticalAlign: "-0.15em", lineHeight: 0 }, dangerouslySetInnerHTML: { __html: HOOF_SVG } }) :
+ic;
+
 const CATS = ["Clinica Geral", "Ortopedia", "Gastroenterologia", "Cirurgia", "Infectologia", "Oftalmologia", "Reproducao", "Neurologia"];
 const LS1 = "ev_custom_v5";
 const LS2 = "ev_extra_v5";
@@ -1330,7 +1337,7 @@ function App({ user, onLogout }) {
       return /*#__PURE__*/React.createElement("button", { key: t.id, onClick: () => aplicarDiag(t),
         style: { position: "relative", background: sug ? C.amberBg : C.card, border: "1px solid " + (sug ? C.amber : C.bord), borderRadius: 10, padding: "12px 10px", cursor: "pointer", textAlign: "left", color: C.text, fontFamily: "Georgia,serif" } },
       sug && /*#__PURE__*/React.createElement("div", { style: { position: "absolute", top: -7, right: 8, background: C.amber, color: "#0f1117", fontSize: 9, fontWeight: 700, padding: "1px 6px", borderRadius: 4, letterSpacing: "0.05em" } }, "SUGERIDO"), /*#__PURE__*/
-      React.createElement("div", { style: { fontSize: 20, marginBottom: 4 } }, t.icon), /*#__PURE__*/
+      React.createElement("div", { style: { fontSize: 20, marginBottom: 4 } }, renderIcon(t.icon)), /*#__PURE__*/
       React.createElement("div", { style: { fontSize: 12, fontWeight: 700, marginBottom: 3, lineHeight: 1.2 } }, t.titulo),
       tags.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 4 } }, tags.map((qid) => /*#__PURE__*/React.createElement(TagPill, { key: qid, qid: qid })))
       );
@@ -1344,7 +1351,7 @@ function App({ user, onLogout }) {
       const tags = getTags(t);
       return /*#__PURE__*/React.createElement("button", { key: t.id, onClick: () => aplicarDiag(t),
         style: { background: "#15192a", border: "1px solid " + C.bord, borderRadius: 10, padding: "10px", cursor: "pointer", textAlign: "left", color: C.muted, fontFamily: "Georgia,serif", opacity: 0.8 } }, /*#__PURE__*/
-      React.createElement("div", { style: { fontSize: 18, marginBottom: 3 } }, t.icon), /*#__PURE__*/
+      React.createElement("div", { style: { fontSize: 18, marginBottom: 3 } }, renderIcon(t.icon)), /*#__PURE__*/
       React.createElement("div", { style: { fontSize: 11, fontWeight: 600, marginBottom: 3, lineHeight: 1.2 } }, t.titulo),
       tags.length > 0 && /*#__PURE__*/React.createElement("div", { style: { marginTop: 3 } }, tags.map((qid) => /*#__PURE__*/React.createElement(TagPill, { key: qid, qid: qid })))
       );
@@ -1381,7 +1388,7 @@ function App({ user, onLogout }) {
         onTouchEnd: (e) => e.currentTarget.style.background = C.card },
       ex && /*#__PURE__*/React.createElement("div", { style: { position: "absolute", top: 8, right: 8, fontSize: 9, color: "#6a9abf", background: "#1a2a3e", border: "1px solid #3a5a8a", borderRadius: 6, padding: "1px 5px" } }, "MEU"),
       !ex && pers && /*#__PURE__*/React.createElement("div", { style: { position: "absolute", top: 8, right: 8, fontSize: 9, color: C.green, background: "#1a2e1a", border: "1px solid #3a6a3a", borderRadius: 6, padding: "1px 5px" } }, "EDIT"), /*#__PURE__*/
-      React.createElement("div", { style: { fontSize: 24, marginBottom: 5 } }, p.icon), /*#__PURE__*/
+      React.createElement("div", { style: { fontSize: 24, marginBottom: 5 } }, renderIcon(p.icon)), /*#__PURE__*/
       React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, lineHeight: 1.2 } }, p.titulo), /*#__PURE__*/
       React.createElement("div", { style: { fontSize: 10, color: C.gold, textTransform: "uppercase", marginBottom: tags.length ? 4 : 0 } }, p.categoria),
       tags.length > 0 && /*#__PURE__*/React.createElement("div", null, tags.map((qid) => /*#__PURE__*/React.createElement(TagPill, { key: qid, qid: qid })))
@@ -1430,7 +1437,7 @@ function App({ user, onLogout }) {
     aba === "prescricoes" && tela === "editor" && aberta && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/
     React.createElement(BtnS, { onClick: () => setTela("lista"), style: { marginBottom: 12 } }, "Voltar"), /*#__PURE__*/
     React.createElement("div", { style: { marginBottom: 10 } }, /*#__PURE__*/
-    React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: C.gold, marginBottom: 2 } }, aberta.icon, " ", aberta.titulo), /*#__PURE__*/
+    React.createElement("div", { style: { fontSize: 16, fontWeight: 700, color: C.gold, marginBottom: 2 } }, renderIcon(aberta.icon), " ", aberta.titulo), /*#__PURE__*/
     React.createElement("div", { style: { fontSize: 11, color: C.dim } }, "Edite livremente - salve para gravar")
     ), /*#__PURE__*/
     React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 } }, /*#__PURE__*/
