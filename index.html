@@ -7,52 +7,132 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="EquiVet"/>
   <meta name="theme-color" content="#0a0e1a"/>
-    <link rel="apple-touch-icon" href="icon-180.png"/>
   <link rel="manifest" href="manifest-clinica.json"/>
-  <title>EquiVet — Medicina Equina</title>
+  <link rel="apple-touch-icon" href="hero-equivet.png"/>
+  <link rel="icon" type="image/png" href="hero-equivet.png"/>
+  <title>EquiVet IA — Ecossistema Equino</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
     body{background:#0a0e1a;font-family:Georgia,serif;color:#e8e0d0;min-height:100vh;display:flex;flex-direction:column;}
-    .hero{padding:48px 24px 32px;text-align:center;}
-    .hero-icon{font-size:64px;display:block;margin-bottom:16px;}
+
+    .hero{padding:32px 24px 20px;text-align:center;}
+    .hero-icon{
+      height:160px;width:auto;display:block;margin:0 auto 14px;
+      filter:drop-shadow(0 0 24px rgba(125,232,255,0.18));
+    }
     .hero h1{font-size:28px;color:#d4a96a;letter-spacing:0.04em;margin-bottom:6px;}
     .hero p{font-size:13px;color:#5a6a7a;letter-spacing:0.1em;text-transform:uppercase;}
-    .divider{width:48px;height:2px;background:linear-gradient(90deg,transparent,#d4a96a,transparent);margin:28px auto;}
-    .apps{padding:0 20px 40px;display:flex;flex-direction:column;gap:16px;max-width:480px;margin:0 auto;width:100%;}
-    .app-card{background:#131828;border-radius:16px;padding:24px;display:flex;align-items:center;gap:18px;text-decoration:none;color:inherit;border:1px solid #1e2a40;transition:all 0.18s;position:relative;overflow:hidden;}
-    .app-card::before{content:"";position:absolute;inset:0;opacity:0;transition:opacity 0.18s;}
-    .app-card.clinica::before{background:linear-gradient(135deg,#d4a96a08,transparent);}
-    .app-card.uti::before{background:linear-gradient(135deg,#e0555508,transparent);}
+
+    .divider{width:48px;height:2px;background:linear-gradient(90deg,transparent,#d4a96a,transparent);margin:24px auto;}
+
+    .apps{padding:0 20px 32px;display:flex;flex-direction:column;gap:12px;max-width:520px;margin:0 auto;width:100%;}
+
+    .app-card{
+      background:#131828;border-radius:16px;padding:20px 22px;
+      display:flex;align-items:center;gap:16px;
+      text-decoration:none;color:inherit;
+      border:1px solid #1e2a40;
+      transition:all 0.18s;position:relative;overflow:hidden;
+      cursor:pointer;
+    }
+    .app-card::before{content:"";position:absolute;inset:0;opacity:0;transition:opacity 0.18s;pointer-events:none;}
+    .app-card:hover{border-color:#2e3a55;transform:translateY(-1px);}
     .app-card:active::before{opacity:1;}
     .app-card:active{transform:scale(0.98);}
-    .app-icon{font-size:44px;flex-shrink:0;line-height:1;}
-    .app-info{flex:1;}
-    .app-name{font-size:18px;font-weight:700;margin-bottom:4px;}
-    .app-name.clinica{color:#d4a96a;}
-    .app-name.uti{color:#e05555;}
-    .app-desc{font-size:12px;color:#5a6a7a;line-height:1.5;}
+
+    /* Tint por módulo */
+    .app-card.clinica::before { background:linear-gradient(135deg,#d4a96a10,transparent); }
+    .app-card.uti::before     { background:linear-gradient(135deg,#e0555510,transparent); }
+    .app-card.chat::before    { background:linear-gradient(135deg,#7eb8a410,transparent); }
+    .app-card.rx::before      { background:linear-gradient(135deg,#6b9bd110,transparent); }
+    .app-card.lab::before     { background:linear-gradient(135deg,#d4845a10,transparent); }
+    .app-card.farmacos::before{ background:linear-gradient(135deg,#a07cb510,transparent); }
+
+    .app-icon{font-size:38px;flex-shrink:0;line-height:1;width:50px;text-align:center;}
+    .app-info{flex:1;min-width:0;}
+    .app-name{font-size:17px;font-weight:700;margin-bottom:3px;}
+    .app-name.clinica { color:#d4a96a; }
+    .app-name.uti     { color:#e05555; }
+    .app-name.chat    { color:#7eb8a4; }
+    .app-name.rx      { color:#6b9bd1; }
+    .app-name.lab     { color:#d4845a; }
+    .app-name.farmacos{ color:#a07cb5; }
+    .app-desc{font-size:12px;color:#6a7a8a;line-height:1.5;}
     .app-arrow{font-size:20px;color:#2a3a50;flex-shrink:0;}
-    .app-tag{position:absolute;top:12px;right:12px;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:2px 7px;border-radius:10px;}
-    .tag-clinica{background:#d4a96a18;color:#d4a96a;border:1px solid #d4a96a44;}
-    .tag-uti{background:#e0555518;color:#e05555;border:1px solid #e0555544;}
-    .install-hint{margin:0 20px 32px;background:#131828;border:1px solid #1e2a40;border-radius:12px;padding:16px;max-width:480px;margin-left:auto;margin-right:auto;}
-    .install-hint h3{font-size:13px;color:#d4a96a;margin-bottom:10px;letter-spacing:0.04em;}
-    .install-step{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;}
-    .step-num{width:20px;height:20px;background:#d4a96a22;border:1px solid #d4a96a55;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;color:#d4a96a;flex-shrink:0;margin-top:1px;}
-    .install-step p{font-size:12px;color:#7a8a9a;line-height:1.5;}
+
+    .app-tag{
+      position:absolute;top:11px;right:12px;
+      font-size:8.5px;letter-spacing:0.08em;text-transform:uppercase;
+      padding:2px 7px;border-radius:10px;font-family:'SF Mono',Menlo,monospace;
+    }
+    .tag-clinica { background:#d4a96a18; color:#d4a96a; border:1px solid #d4a96a44; }
+    .tag-uti     { background:#e0555518; color:#e05555; border:1px solid #e0555544; }
+    .tag-chat    { background:#7eb8a418; color:#7eb8a4; border:1px solid #7eb8a444; }
+    .tag-rx      { background:#6b9bd118; color:#6b9bd1; border:1px solid #6b9bd144; }
+    .tag-lab     { background:#d4845a18; color:#d4845a; border:1px solid #d4845a44; }
+    .tag-farmacos{ background:#a07cb518; color:#a07cb5; border:1px solid #a07cb544; }
+
+    /* Section labels */
+    .section-label{
+      font-size:10px;letter-spacing:0.2em;text-transform:uppercase;
+      color:#3a4a60;font-family:'SF Mono',Menlo,monospace;
+      padding:14px 24px 8px;max-width:520px;margin:0 auto;width:100%;
+    }
+
+    .install-hint{
+      margin:0 20px 24px;background:#131828;border:1px solid #1e2a40;
+      border-radius:12px;padding:16px;max-width:520px;margin-left:auto;margin-right:auto;
+    }
+    .install-hint h3{font-size:12.5px;color:#d4a96a;margin-bottom:10px;letter-spacing:0.04em;}
+    .install-step{display:flex;gap:10px;margin-bottom:7px;align-items:flex-start;}
+    .step-num{
+      width:18px;height:18px;background:#d4a96a22;border:1px solid #d4a96a55;
+      border-radius:50%;display:flex;align-items:center;justify-content:center;
+      font-size:10px;color:#d4a96a;flex-shrink:0;margin-top:1px;
+    }
+    .install-step p{font-size:11.5px;color:#7a8a9a;line-height:1.5;}
     .install-step strong{color:#c8b898;}
+
     .footer{text-align:center;padding:16px;font-size:11px;color:#2a3a50;margin-top:auto;}
+    .footer span{color:#d4a96a;}
+
+    /* Modal Rx */
+    .modal-bg{
+      position:fixed;inset:0;background:rgba(10,14,26,0.85);
+      display:none;align-items:center;justify-content:center;z-index:100;padding:24px;
+      backdrop-filter:blur(4px);
+    }
+    .modal-bg.show{display:flex;}
+    .modal{
+      background:#131828;border:1px solid #2a3a55;border-radius:16px;
+      padding:24px;max-width:440px;width:100%;
+    }
+    .modal h2{font-size:18px;color:#6b9bd1;margin-bottom:10px;}
+    .modal p{font-size:13px;line-height:1.6;color:#a0aebe;margin-bottom:8px;}
+    .modal code{
+      font-family:'SF Mono',Menlo,monospace;font-size:11.5px;
+      background:#0a0e1a;color:#d4a96a;padding:2px 6px;border-radius:3px;
+      word-break:break-all;
+    }
+    .modal-close{
+      background:#1e2a40;color:#e8e0d0;border:none;padding:10px 18px;
+      font-family:Georgia,serif;font-size:13px;border-radius:8px;
+      cursor:pointer;margin-top:16px;width:100%;
+    }
+    .modal-close:hover{background:#2a3a55;}
   </style>
 </head>
 <body>
 
 <div class="hero">
-  <span class="hero-icon">🐎</span>
-  <h1>EquiVet</h1>
-  <p>Medicina Equina — Dr. Ricardo</p>
+  <img src="hero-equivet.png" alt="EquiVet IA" class="hero-icon"/>
+  <h1>EquiVet IA</h1>
+  <p>Medicina Equina — Dr. Ricardo Midão</p>
 </div>
 
 <div class="divider"></div>
+
+<div class="section-label">Atendimento &amp; Diagnóstico</div>
 
 <div class="apps">
   <a href="equivet-clinica.html" class="app-card clinica">
@@ -60,24 +140,72 @@
     <div class="app-icon">📋</div>
     <div class="app-info">
       <div class="app-name clinica">EquiVet Clínica</div>
-      <div class="app-desc">Prescrições prontas, diagnósticos personalizados e cobrança por atendimento</div>
+      <div class="app-desc">Prescrições, diagnósticos personalizados e cobrança por atendimento</div>
     </div>
     <div class="app-arrow">›</div>
   </a>
 
-  <a href="equivet-uti.html" class="app-card uti">
-    <div class="app-tag tag-uti">UTI</div>
-    <div class="app-icon">🏇</div>
+  <a href="../Equivet%20Lab/equivet_lab.html" class="app-card lab">
+    <div class="app-tag tag-lab">Lab · v1.1</div>
+    <div class="app-icon">🩸</div>
     <div class="app-info">
-      <div class="app-name uti">EquiVet UTI</div>
-      <div class="app-desc">Protocolo pré e pós-operatório de cólica cirúrgica com escores de monitoramento</div>
+      <div class="app-name lab">EquiVet Lab</div>
+      <div class="app-desc">Hemograma e bioquímico com import de PDF e leitura por IA</div>
+    </div>
+    <div class="app-arrow">›</div>
+  </a>
+
+  <a href="#" onclick="abrirRx(event)" class="app-card rx">
+    <div class="app-tag tag-rx">Rx · Desktop</div>
+    <div class="app-icon">🦴</div>
+    <div class="app-info">
+      <div class="app-name rx">EquiVet Rx</div>
+      <div class="app-desc">Análise radiográfica equina com Claude Opus + ML (Streamlit)</div>
+    </div>
+    <div class="app-arrow">›</div>
+  </a>
+
+  <a href="../EquiVet%20Fármacos/EquiVet%20Fármacos.html" class="app-card farmacos">
+    <div class="app-tag tag-farmacos">Fármacos</div>
+    <div class="app-icon">💊</div>
+    <div class="app-info">
+      <div class="app-name farmacos">EquiVet Fármacos</div>
+      <div class="app-desc">Banco de fármacos equinos com calculadora de dose por peso</div>
     </div>
     <div class="app-arrow">›</div>
   </a>
 </div>
 
+<div class="section-label">Emergência</div>
+
+<div class="apps">
+  <a href="equivet-uti.html" class="app-card uti">
+    <div class="app-tag tag-uti">UTI</div>
+    <div class="app-icon">🚨</div>
+    <div class="app-info">
+      <div class="app-name uti">EquiVet UTI</div>
+      <div class="app-desc">Protocolos pré/pós-operatório de cólica cirúrgica e escores de monitoramento</div>
+    </div>
+    <div class="app-arrow">›</div>
+  </a>
+</div>
+
+<div class="section-label">Apoio &amp; Comunicação</div>
+
+<div class="apps">
+  <a href="https://centaurovet.com.br/chat.html" target="_blank" rel="noopener" class="app-card chat">
+    <div class="app-tag tag-chat">Chat · Online</div>
+    <div class="app-icon">💬</div>
+    <div class="app-info">
+      <div class="app-name chat">EquiVet IA Chat</div>
+      <div class="app-desc">Assistente conversacional para veterinários, proprietários, treinadores e ferradores</div>
+    </div>
+    <div class="app-arrow">↗</div>
+  </a>
+</div>
+
 <div class="install-hint">
-  <h3>📲 Adicionar à tela inicial</h3>
+  <h3>📲 Adicionar à tela inicial (PWA)</h3>
   <div class="install-step">
     <div class="step-num">1</div>
     <p><strong>iPhone:</strong> toque em compartilhar (⬆) no Safari → "Adicionar à Tela de Início"</p>
@@ -88,11 +216,25 @@
   </div>
   <div class="install-step">
     <div class="step-num">3</div>
-    <p>O app abre em <strong>tela cheia</strong>, sem barra do navegador, e funciona <strong>offline</strong></p>
+    <p>Clínica e UTI rodam <strong>offline</strong> · Lab funciona offline para validação, IA precisa de internet</p>
   </div>
 </div>
 
-<div class="footer">EquiVet v1.0 — dados salvos localmente no dispositivo</div>
+<div class="footer">EquiVet IA <span>v2.0</span> — 6 módulos integrados · dados locais ou Supabase</div>
+
+<!-- Modal Rx -->
+<div class="modal-bg" id="modal-rx" onclick="if(event.target===this)fecharModal()">
+  <div class="modal">
+    <h2>🦴 EquiVet Rx — App Desktop</h2>
+    <p>O módulo de análise radiográfica roda como <strong style="color:#e8e0d0">aplicativo desktop Windows</strong> (Streamlit), porque processa imagens DICOM pesadas e usa modelo de ML local (EfficientNet-B0).</p>
+    <p style="margin-top:10px"><strong style="color:#e8e0d0">Para abrir:</strong></p>
+    <p>1. Vá em <code>/Volumes/Centauro/EquivetIAOpus4/</code></p>
+    <p>2. Duplo-clique em <code>EXECUTAR_PORTATIL.bat</code></p>
+    <p>3. O app abre em <code>localhost:8501</code> no navegador</p>
+    <p style="margin-top:10px;font-size:12px;color:#6a7a8a"><em>Para o Campo de Treinos (HITL), use <code>CAMPO_TREINOS.bat</code> (porta 8502).</em></p>
+    <button class="modal-close" onclick="fecharModal()">Entendi</button>
+  </div>
+</div>
 
 <script>
   if('serviceWorker' in navigator){
@@ -100,6 +242,14 @@
       .then(r => console.log('SW registrado:', r.scope))
       .catch(e => console.log('SW erro:', e));
   }
+  function abrirRx(e){
+    e.preventDefault();
+    document.getElementById('modal-rx').classList.add('show');
+  }
+  function fecharModal(){
+    document.getElementById('modal-rx').classList.remove('show');
+  }
+  document.addEventListener('keydown', e => { if(e.key==='Escape') fecharModal(); });
 </script>
 </body>
 </html>
