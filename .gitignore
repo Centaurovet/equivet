@@ -1,0 +1,6 @@
+# Metadata do macOS
+._*
+.DS_Store
+
+# Literatura com direitos autorais (Smith / Adams) — NAO publicar. Usada so no backend/RAG.
+literatura/

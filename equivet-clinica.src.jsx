@@ -44,6 +44,7 @@ const LS_TAGS = "ev_base_tags_v1";
 const LS_CRMV = "ev_crmv_v1";
 const LS_PIX  = "ev_pix_v1";
 const LS_PRECOS = "ev_precos_v1";
+const LS_FAT = "ev_faturas_v1";
 
 // Backend Railway (mesmo do chat). /literatura autentica via JWT do usuario (Supabase).
 const BACKEND_URL = "https://web-production-2f5bf.up.railway.app";
@@ -649,6 +650,10 @@ function App({ user, onLogout }){
   const avisar = m => { setAviso(m); setTimeout(()=>setAviso(""),3500); };
   const [salvoNuvem,setSN]        = useState(false); // true = gravado no Supabase
 
+  // ---- FATURAS (controle de recebimento) ----
+  const [faturas,setFaturas]      = useState([]);
+  const [fatGerada,setFatGerada]  = useState(false);
+
   // ---- LITERATURA (consulta RAG ao backend) ----
   const [litPergunta,setLitP]     = useState("");
   const [litResposta,setLitR]     = useState("");
@@ -696,9 +701,11 @@ function App({ user, onLogout }){
     setExtra(lsGet(LS2,[]));
     setAtend(lsGet(LS3,[]));
     setBaseTags(lsGet(LS_TAGS,{}));
+    setFaturas(lsGet(LS_FAT,[]));
   },[]);
 
   useEffect(()=>{ lsSet(LS3,atendimentos); },[atendimentos]);
+  useEffect(()=>{ lsSet(LS_FAT,faturas); },[faturas]);
 
   // ---- SYNC COM A NUVEM (Supabase) ----
   const sbParaLocal = r => ({
@@ -742,6 +749,59 @@ function App({ user, onLogout }){
       }catch(e){ console.warn('Sync nuvem indisponível:', e.message); }
     })();
   },[user]);
+  // ---- SYNC DE FATURAS COM A NUVEM (Supabase) ----
+  const sbFatParaLocal = r => ({
+    id: r.local_id || "sb_"+r.id,
+    dataEmissao: r.data_emissao, paciente: r.paciente_nome||"", prop: r.proprietario_nome||"",
+    itens: r.itens||[], mensagem: r.mensagem||"", valorTotal: parseFloat(r.valor_total)||0,
+    status: r.status||"aberta", pagoEm: r.pago_em||null, criadoEm: r.criado_em||new Date().toISOString(),
+  });
+
+  useEffect(()=>{
+    if(!user) return;
+    (async()=>{
+      try{
+        const { data: rows, error } = await supabase.from('faturas')
+          .select('*').eq('veterinario_id', user.id)
+          .order('criado_em',{ascending:false}).limit(500);
+        if(error||!rows){ if(error) console.warn('Sync faturas: leitura falhou:', error.message); return; }
+        const locais = lsGet(LS_FAT,[]);
+        const porId  = new Map(locais.map(f=>[f.id,f]));
+        const idsNuvem = new Set(rows.map(r=>r.local_id).filter(Boolean));
+        let mudou = false;
+        // nuvem → local: restaura faturas + reconcilia status ('paga' prevalece)
+        for(const r of rows){
+          const lid = r.local_id || "sb_"+r.id;
+          const loc = porId.get(lid);
+          if(!loc){ porId.set(lid, sbFatParaLocal(r)); mudou = true; }
+          else if(loc.status!==r.status){
+            if(loc.status==="paga"){
+              // pagou offline → empurra para a nuvem
+              supabase.from('faturas').update({status:"paga",pago_em:loc.pagoEm||new Date().toISOString()})
+                .eq('id', r.id).then(()=>{},()=>{});
+            } else {
+              porId.set(lid, {...loc, status:"paga", pagoEm:r.pago_em||null}); mudou = true;
+            }
+          }
+        }
+        if(mudou){
+          const merged=[...porId.values()].sort((a,b)=>(b.criadoEm||"").localeCompare(a.criadoEm||"")).slice(0,500);
+          setFaturas(merged);
+        }
+        // local → nuvem: reenvia o que ficou offline
+        const pendentes = locais.filter(f=>!String(f.id).startsWith("sb_") && !idsNuvem.has(f.id));
+        for(const f of pendentes){
+          await supabase.from('faturas').insert({
+            local_id:f.id, data_emissao:f.dataEmissao, paciente_nome:f.paciente||"-",
+            proprietario_nome:f.prop||null, itens:f.itens||[], mensagem:f.mensagem||"",
+            valor_total:f.valorTotal, status:f.status||"aberta", pago_em:f.pagoEm||null,
+            veterinario_id:user.id });
+        }
+        if(pendentes.length) console.log('Sync: '+pendentes.length+' fatura(s) reenviada(s) à nuvem.');
+      }catch(e){ console.warn('Sync faturas indisponível:', e.message); }
+    })();
+  },[user]);
+
   useEffect(()=>{ lsSet(LS_TAGS,baseTags); },[baseTags]);
   useEffect(()=>{
     lsSet(LS_CRMV,crmv);
@@ -855,6 +915,60 @@ function App({ user, onLogout }){
     itens.forEach(i=>ls.push("  - "+i.nome+(i.qty>1?" (x"+i.qty+")":"")+": R$ "+(i.valor*i.qty).toFixed(2).replace(".",",")));
     return "Ola! Segue o atendimento:\n\nPaciente: "+(paciente||"-")+"\nProprietario: "+(prop||"-")+"\nData: "+hoje+"\n\n"+ls.join("\n")+"\n\nTOTAL: R$ "+total.toFixed(2).replace(".",",")+"\n\nChave PIX: "+(pix||"[SEU PIX]")+"\nDr. Ricardo | CRMV-"+(crmv||"[UF] [No]");
   };
+
+  // === FATURAS (controle de recebimento) ===
+  const itensFatura = () => {
+    const ls=[];
+    if(visita)      ls.push({nome:"Visita clinica",valor:vV});
+    if(vK>0)        ls.push({nome:"Deslocamento ("+(parseFloat(km)||0)+" km)",valor:vK});
+    if(vR>0)        ls.push({nome:"Radiografia"+(nR>1?"s":"")+" ("+nR+" posic"+(nR>1?"oes":"ao")+")",valor:vR});
+    if(cirug&&vC>0) ls.push({nome:descC||"Cirurgia",valor:vC});
+    itens.forEach(i=>ls.push({nome:i.nome+(i.qty>1?" (x"+i.qty+")":""),valor:i.valor*i.qty}));
+    return ls;
+  };
+
+  const gerarFatura = async () => {
+    if(total<=0){ avisar("Adicione ao menos um servico para gerar a fatura."); return; }
+    const f = {
+      id:"ft_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7),
+      dataEmissao: todayISO(), paciente: paciente.trim()||"-", prop: prop.trim(),
+      itens: itensFatura(), mensagem: msg(), valorTotal: total,
+      status:"aberta", pagoEm:null, criadoEm:new Date().toISOString(),
+    };
+    setFaturas([f,...faturas].slice(0,500));
+    setFatGerada(true); setTimeout(()=>setFatGerada(false),3000);
+    lsSet(LS_PRECOS,{visita:vlVisita,km:vlKm,rx:vlRx,cirug:vlCirug});
+    try{
+      const { error } = await supabase.from('faturas').insert({
+        local_id:f.id, data_emissao:f.dataEmissao, paciente_nome:f.paciente,
+        proprietario_nome:f.prop||null, itens:f.itens, mensagem:f.mensagem,
+        valor_total:f.valorTotal, status:"aberta", veterinario_id:user.id });
+      if(error) console.warn('Fatura: salvar na nuvem falhou:', error.message);
+    }catch(e){ console.warn('Fatura salva só localmente:', e.message); }
+  };
+
+  const marcarFaturaPaga = f => {
+    const pagoEm = new Date().toISOString();
+    setFaturas(faturas.map(x=>x.id===f.id?{...x,status:"paga",pagoEm}:x));
+    try{
+      const q = String(f.id).startsWith("sb_")
+        ? supabase.from('faturas').update({status:"paga",pago_em:pagoEm}).eq('id', String(f.id).slice(3))
+        : supabase.from('faturas').update({status:"paga",pago_em:pagoEm}).eq('local_id', f.id);
+      q.then(({error})=>{ if(error) console.warn('Fatura: atualizar na nuvem falhou:', error.message); });
+    }catch(e){ console.warn('Fatura atualizada só localmente:', e.message); }
+  };
+
+  const excluirFatura = f => setConfirma({
+    msg:"Excluir esta fatura? (sera removida tambem da nuvem)",
+    acao:()=>{
+      setFaturas(faturas.filter(x=>x.id!==f.id));
+      try{
+        const q = String(f.id).startsWith("sb_")
+          ? supabase.from('faturas').delete().eq('id', String(f.id).slice(3))
+          : supabase.from('faturas').delete().eq('local_id', f.id);
+        q.then(({error})=>{ if(error) console.warn('Excluir fatura na nuvem falhou:', error.message); });
+      }catch(e){ console.warn('Excluir fatura na nuvem indisponível:', e.message); }
+    }});
 
   // === SUGESTOES ===
   const regrasAtivas = useMemo(()=>{
@@ -1591,6 +1705,34 @@ function App({ user, onLogout }){
             <BtnP onClick={()=>{copyToClipboard(msg());lsSet(LS_PRECOS,{visita:vlVisita,km:vlKm,rx:vlRx,cirug:vlCirug});setCopiado(true);setTimeout(()=>setCopiado(false),2000);}} style={{width:"100%",padding:"12px"}}>
               {copiado?"Copiado!":"Copiar mensagem"}
             </BtnP>
+            <button onClick={gerarFatura}
+              style={{width:"100%",padding:"12px",marginTop:8,background:fatGerada?"#2a4a2a":"transparent",color:fatGerada?C.green:C.gold,border:"1px solid "+(fatGerada?"#3a6a3a":C.gold),borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"Georgia,serif"}}>
+              {fatGerada?"✓ Fatura gerada — em aberto":"Gerar fatura (fica em aberto ate marcar como paga)"}
+            </button>
+          </>}
+
+          {faturas.length>0&&<>
+            <Sec>Faturas ({faturas.filter(f=>f.status==="aberta").length} em aberto)</Sec>
+            {faturas.map(f=>(
+              <div key={f.id} style={{background:C.card,border:"1px solid "+(f.status==="aberta"?"#8a6a3a":C.bord),borderRadius:8,padding:"9px 12px",marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{f.paciente||"-"}</div>
+                  <div style={{fontSize:11,color:C.dim}}>{(f.dataEmissao||"").split("-").reverse().join("/")}{f.prop?" · "+f.prop:""}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:14,fontWeight:700,color:C.gold}}>R$ {(f.valorTotal||0).toFixed(2).replace(".",",")}</div>
+                  <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.05em",color:f.status==="paga"?C.green:"#e0a040"}}>{f.status==="paga"?"PAGA":"EM ABERTO"}</div>
+                </div>
+                {f.status==="aberta"
+                  ? <button onClick={()=>marcarFaturaPaga(f)} style={{background:"#2a4a2a",color:C.green,border:"1px solid #3a6a3a",borderRadius:7,padding:"6px 10px",cursor:"pointer",fontSize:11,fontWeight:700,whiteSpace:"nowrap"}}>Marcar paga</button>
+                  : <span style={{fontSize:15,color:C.green}}>✓</span>}
+                <button onClick={()=>excluirFatura(f)} style={{background:"none",border:"none",color:"#7a3a3a",cursor:"pointer",fontSize:15,padding:"0 2px"}}>x</button>
+              </div>
+            ))}
+            {faturas.some(f=>f.status==="aberta")&&<div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:C.muted,padding:"4px 2px"}}>
+              <span>Total em aberto</span>
+              <span style={{color:"#e0a040",fontWeight:700}}>R$ {faturas.filter(f=>f.status==="aberta").reduce((a,f)=>a+(f.valorTotal||0),0).toFixed(2).replace(".",",")}</span>
+            </div>}
           </>}
         </div>}
 
