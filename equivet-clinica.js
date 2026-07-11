@@ -1267,6 +1267,17 @@ function App({ user, onLogout }) {
     React.createElement("div", { style: { fontSize: 18, fontWeight: 700, color: C.gold } }, "EquiVet Clinica"), /*#__PURE__*/
     React.createElement("div", { style: { fontSize: 10, color: C.dim, letterSpacing: "0.08em", textTransform: "uppercase" } }, "Atendimento · Prescricoes · Cobranca")
     ), /*#__PURE__*/
+    React.createElement("button", { onClick: () => {
+        const base = "https://centaurovet.com.br/equivet-lab/";
+        const qs = atendVinculoId ?
+        "?atend=" + encodeURIComponent(atendVinculoId) + "&pac=" + encodeURIComponent(paciente.trim()) :
+        paciente.trim() ? "?pac=" + encodeURIComponent(paciente.trim()) : "";
+        window.open(base + qs, "_blank", "noopener");
+      }, title: "Abrir EquiVet Lab (hemograma/bioquimico)",
+      style: { background: "transparent", border: "1px solid #5a3030", borderRadius: 8, padding: "5px 10px",
+        color: "#d06a6a", fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" } }, "🩸 Lab"
+
+    ), /*#__PURE__*/
     React.createElement("button", { onClick: () => setShowConfig(true), title: "Configuracoes do veterinario",
       style: { background: "transparent", border: "1px solid #2a3040", borderRadius: 8, padding: "5px 10px",
         color: crmv ? C.gold : C.dim, fontSize: 13, cursor: "pointer" } }, "⚙️"
