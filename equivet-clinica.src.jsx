@@ -856,8 +856,10 @@ function App({ user, onLogout }){
     if(isExtra(aberta)){
       const ue=extra.map(e=>e.id===aberta.id?{...e,queixas:editTags}:e);
       lsSet(LS2,ue); setExtra(ue);
+      upsertPrescNuvem({local_id:String(aberta.id),titulo:aberta.titulo,categoria:aberta.categoria,icon:aberta.icon,queixas:editTags,template:tpl});
     } else {
       setBaseTags({...baseTags,[aberta.id]:editTags});
+      upsertPrescNuvem({local_id:"ovr_"+aberta.id,titulo:aberta.titulo,categoria:aberta.categoria,icon:aberta.icon,queixas:editTags,template:tpl});
     }
     setSalvo(true); setTimeout(()=>setSalvo(false),3000);
   };
@@ -869,6 +871,8 @@ function App({ user, onLogout }){
     setTexto(inject(aberta.template));
     setEditTags(aberta.queixas||[]);
     setCR(false);
+    if(isExtra(aberta)) upsertPrescNuvem(extraParaNuvem({...aberta,queixas:aberta.queixas||[]}, {}));
+    else delPrescNuvem("ovr_"+aberta.id);
   };
 
   const excluir = () => {
@@ -876,6 +880,7 @@ function App({ user, onLogout }){
     const ue=extra.filter(e=>e.id!==aberta.id);
     const uc={...custom}; delete uc[aberta.id];
     lsSet(LS2,ue); lsSet(LS1,uc); setExtra(ue); setCustom(uc); setAberta(null); setTela("lista");
+    delPrescNuvem(aberta.id);
   };
 
   const criar = () => {
@@ -883,11 +888,83 @@ function App({ user, onLogout }){
     const cat = novoCatC.trim()||novoCat;
     const nova = {id:"cx_"+Date.now(),titulo:novoTit.trim(),categoria:cat,icon:novoIcon,template:NOVO_TPL(novoTit.trim()),queixas:novoQ};
     const ue=[...extra,nova]; lsSet(LS2,ue); setExtra(ue);
+    upsertPrescNuvem(extraParaNuvem(nova, null));
     setNT(""); setNC("Clinica Geral"); setNCC(""); setNI("🐎"); setNovoQ([]);
     abrirEditor(nova);
   };
 
   const copiar = () => { copyToClipboard(texto); setCopiado(true); setTimeout(()=>setCopiado(false),2000); };
+
+  // === SYNC DE PROTOCOLOS "MEU" COM A NUVEM (prescricoes_base) ===
+  const upsertPrescNuvem = async reg => {
+    if(!user) return;
+    try{
+      const { error } = await supabase.from('prescricoes_base').upsert({
+        local_id: reg.local_id, titulo: reg.titulo, categoria: reg.categoria||null,
+        icon: reg.icon||null, queixas: reg.queixas||[], template: reg.template,
+        sistema:false, publica:false, criado_por:user.id,
+      },{ onConflict:'criado_por,local_id' });
+      if(error) console.warn('Protocolo: salvar na nuvem falhou:', error.message);
+    }catch(e){ console.warn('Protocolo salvo só localmente:', e.message); }
+  };
+
+  const delPrescNuvem = localId => {
+    if(!user) return;
+    try{
+      supabase.from('prescricoes_base').delete()
+        .eq('criado_por', user.id).eq('local_id', String(localId))
+        .then(({error})=>{ if(error) console.warn('Excluir protocolo na nuvem falhou:', error.message); });
+    }catch(e){ console.warn('Excluir protocolo na nuvem indisponível:', e.message); }
+  };
+
+  const extraParaNuvem = (e, customMap) => ({
+    local_id:String(e.id), titulo:e.titulo, categoria:e.categoria, icon:e.icon,
+    queixas:e.queixas||[], template:(customMap&&customMap[e.id]!==undefined)?customMap[e.id]:e.template,
+  });
+
+  useEffect(()=>{
+    if(!user) return;
+    (async()=>{
+      try{
+        const { data: rows, error } = await supabase.from('prescricoes_base')
+          .select('*').eq('criado_por', user.id).eq('sistema', false)
+          .not('local_id','is',null).limit(500);
+        if(error||!rows){ if(error) console.warn('Sync protocolos: leitura falhou:', error.message); return; }
+        const locaisExtra  = lsGet(LS2,[]);
+        const locaisCustom = lsGet(LS1,{});
+        const locaisTags   = lsGet(LS_TAGS,{});
+        const nuvemExtras = rows.filter(r=>!String(r.local_id).startsWith("ovr_"));
+        const nuvemOvr    = rows.filter(r=>String(r.local_id).startsWith("ovr_"));
+        // nuvem → local: restaura protocolos MEU ausentes (aparelho novo)
+        const idsLocais = new Set(locaisExtra.map(e=>String(e.id)));
+        const novos = nuvemExtras.filter(r=>!idsLocais.has(String(r.local_id)))
+          .map(r=>({id:r.local_id,titulo:r.titulo,categoria:r.categoria||"Clinica Geral",icon:r.icon||"🐎",template:r.template,queixas:r.queixas||[]}));
+        if(novos.length){ const ue=[...locaisExtra,...novos]; lsSet(LS2,ue); setExtra(ue); }
+        // nuvem → local: edições de templates base (custom) e tags
+        const c={...locaisCustom}, t={...locaisTags}; let mc=false, mt=false;
+        for(const r of nuvemOvr){
+          const bid=String(r.local_id).slice(4);
+          if(!(bid in c) && r.template){ c[bid]=r.template; mc=true; }
+          if(!(bid in t) && r.queixas && r.queixas.length){ t[bid]=r.queixas; mt=true; }
+        }
+        if(mc){ lsSet(LS1,c); setCustom(c); }
+        if(mt){ lsSet(LS_TAGS,t); setBaseTags(t); }
+        // local → nuvem: envia o que ficou offline
+        const idsNuvem = new Set(nuvemExtras.map(r=>String(r.local_id)));
+        for(const e of locaisExtra){
+          if(!idsNuvem.has(String(e.id))) await upsertPrescNuvem(extraParaNuvem(e, locaisCustom));
+        }
+        const idsOvrNuvem = new Set(nuvemOvr.map(r=>String(r.local_id)));
+        for(const bid of Object.keys(locaisCustom)){
+          const b = BASE.find(x=>String(x.id)===String(bid));
+          if(b && !idsOvrNuvem.has("ovr_"+bid)){
+            await upsertPrescNuvem({local_id:"ovr_"+bid,titulo:b.titulo,categoria:b.categoria,icon:b.icon,
+              queixas:locaisTags[bid]||b.queixas||[],template:locaisCustom[bid]});
+          }
+        }
+      }catch(e){ console.warn('Sync protocolos indisponível:', e.message); }
+    })();
+  },[user]);
 
   // === COBRANCA ===
   const vV = visita?parseFloat(vlVisita)||0:0;
