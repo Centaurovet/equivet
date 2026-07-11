@@ -655,6 +655,11 @@ function App({ user, onLogout }) {
   const [faturas, setFaturas] = useState([]);
   const [fatGerada, setFatGerada] = useState(false);
 
+  // ---- EXAMES (integração EquiVet Lab) ----
+  const [atendVinculoId, setAtendVinculoId] = useState(null); // local_id do atendimento atual
+  const [exames, setExames] = useState([]); // exames vinculados a esse atendimento
+  const [exameAberto, setExameAberto] = useState(null); // exame expandido (ver laudo)
+
   // ---- LITERATURA (consulta RAG ao backend) ----
   const [litPergunta, setLitP] = useState("");
   const [litResposta, setLitR] = useState("");
@@ -1105,6 +1110,7 @@ function App({ user, onLogout }) {
       criadoEm: new Date().toISOString()
     };
     setAtend([reg, ...atendimentos].slice(0, 500));
+    setAtendVinculoId(reg.id); // passa a ser o atendimento "atual" para vincular exames
     setAS(true);setTimeout(() => setAS(false), 4000);
 
     // 2. Salva no Supabase (em paralelo — não bloqueia se falhar)
@@ -1128,7 +1134,41 @@ function App({ user, onLogout }) {
     } catch (e) {
       console.warn('Supabase offline, dado salvo só localmente:', e.message);
     }
+    return reg.id; // usado por abrirLabExames
   };
+
+  // ---- EXAMES: integração com o EquiVet Lab ----
+  const carregarExames = async (atendId) => {
+    if (!atendId || !user) {setExames([]);return;}
+    try {
+      const { data, error } = await supabase.from('exames').
+      select('*').eq('atendimento_local_id', atendId).
+      order('criado_em', { ascending: false });
+      if (!error && data) setExames(data);
+    } catch (e) {console.warn('Exames: leitura falhou:', e.message);}
+  };
+
+  // Abre o EquiVet Lab vinculado ao atendimento atual (salva antes se preciso).
+  const abrirLabExames = async () => {
+    let id = atendVinculoId;
+    if (!id) {
+      if (!paciente.trim() || !queixa) {avisar("Preencha e salve o atendimento antes de anexar exames.");return;}
+      id = await salvarAtendimento();
+      if (!id) return;
+    }
+    const url = "https://centaurovet.com.br/equivet-lab/?atend=" + encodeURIComponent(id) +
+    "&pac=" + encodeURIComponent(paciente.trim());
+    window.open(url, "_blank", "noopener");
+  };
+
+  // Recarrega exames ao trocar de atendimento vinculado e ao voltar o foco à janela
+  // (o vet fez o exame na aba do Lab e voltou ao Clínica).
+  useEffect(() => {carregarExames(atendVinculoId);}, [atendVinculoId, user]);
+  useEffect(() => {
+    const onFocus = () => {if (atendVinculoId) carregarExames(atendVinculoId);};
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [atendVinculoId]);
 
   const limparAtendimento = () => setConfirma({
     msg: "Limpar o formulario de atendimento atual? (paciente e proprietario do cabecalho serao mantidos)",
@@ -1138,6 +1178,7 @@ function App({ user, onLogout }) {
       setExGeral({ ...EX_GERAL_INIT, motilidade: { ...EX_GERAL_INIT.motilidade } });
       setMods(JSON.parse(JSON.stringify(MOD_INIT)));
       setSugAceitas([]);
+      setAtendVinculoId(null);setExames([]);
     } });
 
   const carregarHist = (a) => {
@@ -1147,6 +1188,7 @@ function App({ user, onLogout }) {
     if (a.exGeral) setExGeral({ ...a.exGeral, motilidade: { ...a.exGeral.motilidade } });else
     setExGeral({ ...EX_GERAL_INIT, motilidade: { ...EX_GERAL_INIT.motilidade } });
     if (a.mods) setMods(JSON.parse(JSON.stringify(a.mods)));
+    setAtendVinculoId(a.id); // exames vinculados a este atendimento reaparecem
     setShowHist(false);
   };
 
@@ -1563,7 +1605,39 @@ function App({ user, onLogout }) {
     ),
     atendSalvo && /*#__PURE__*/React.createElement("div", { style: { background: "#1a2e1a", border: "1px solid #3a6a3a", borderRadius: 8, padding: "8px 12px", marginTop: 8, fontSize: 13, color: C.green } }, "✓ Atendimento salvo ",
     salvoNuvem ? "💾 local + ☁️ nuvem" : "💾 local", " — Total: ", atendimentos.length + 1
-    )
+    ), /*#__PURE__*/
+
+
+    React.createElement(Sec, null, "Exames laboratoriais"), /*#__PURE__*/
+    React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 } }, /*#__PURE__*/
+    React.createElement(BtnS, { onClick: abrirLabExames, style: { color: "#d06a6a", borderColor: "#5a3030" } }, "🩸 Abrir no EquiVet Lab", atendVinculoId ? "" : " (salva o atendimento)"),
+    atendVinculoId && /*#__PURE__*/React.createElement(BtnS, { onClick: () => carregarExames(atendVinculoId) }, "↻ Atualizar")
+    ), /*#__PURE__*/
+    React.createElement("div", { style: { fontSize: 11, color: C.dim, marginBottom: 8, lineHeight: 1.5 } }, "Abre o Lab com este paciente. O resultado (hemograma/bioquímico + laudo) fica vinculado e reaparece aqui — inclusive dias depois, quando o exame chegar."
+
+    ),
+    atendVinculoId && exames.length === 0 && /*#__PURE__*/React.createElement("div", { style: { color: C.dim, fontSize: 12, padding: "6px 0" } }, "Nenhum exame vinculado ainda."),
+    exames.map((ex) => {
+      const nAlt = (ex.alteracoes || []).length;
+      const aberto = exameAberto === ex.id;
+      return /*#__PURE__*/React.createElement("div", { key: ex.id, style: { background: C.card, border: "1px solid " + C.bord, borderRadius: 8, padding: "9px 12px", marginBottom: 6 } }, /*#__PURE__*/
+      React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }, onClick: () => setExameAberto(aberto ? null : ex.id) }, /*#__PURE__*/
+      React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /*#__PURE__*/
+      React.createElement("div", { style: { fontSize: 13, fontWeight: 600, color: C.text } }, "🩸 ", ex.tipo === "sangue" ? "Hemograma / Bioquímico" : ex.tipo, " ", ex.laudo_ia ? /*#__PURE__*/React.createElement("span", { style: { color: C.gold, fontSize: 11 } }, "· com laudo IA") : /*#__PURE__*/React.createElement("span", { style: { color: C.dim, fontSize: 11 } }, "· sem laudo")), /*#__PURE__*/
+      React.createElement("div", { style: { fontSize: 11, color: C.dim } }, (ex.criado_em || "").slice(0, 10).split("-").reverse().join("/"), " · ", nAlt, " alteraç", nAlt === 1 ? "ão" : "ões")
+      ), /*#__PURE__*/
+      React.createElement("span", { style: { color: C.muted, fontSize: 13 } }, aberto ? "▲" : "▼")
+      ),
+      aberto && /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, borderTop: "1px solid " + C.bord, paddingTop: 8 } },
+      nAlt > 0 && /*#__PURE__*/React.createElement("div", { style: { marginBottom: 8 } }, (ex.alteracoes || []).map((a, i) => /*#__PURE__*/
+      React.createElement("div", { key: i, style: { fontSize: 12, color: "#c8c0b0" } }, /*#__PURE__*/React.createElement("span", { style: { color: a.estado === "CRÍTICO" ? "#c05050" : a.estado === "ELEVADO" ? "#d09050" : "#5a9ab0", fontWeight: 700 } }, a.estado), " ", a.nome, ": ", a.valor, " ", a.unidade, " ", /*#__PURE__*/React.createElement("span", { style: { color: C.dim } }, "(ref ", a.ref, ")"))
+      )),
+      ex.laudo_ia ? /*#__PURE__*/
+      React.createElement("div", { style: { fontSize: 12.5, color: C.text, whiteSpace: "pre-wrap", lineHeight: 1.55, fontFamily: "Georgia,serif" } }, ex.laudo_ia) : /*#__PURE__*/
+      React.createElement("div", { style: { fontSize: 12, color: C.dim } }, "Exame salvo sem laudo. Abra no Lab e use \"Analisar por IA\" para gerar.")
+      )
+      );
+    })
     ),
 
 
