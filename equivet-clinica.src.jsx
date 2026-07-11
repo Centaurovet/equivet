@@ -685,6 +685,11 @@ function App({ user, onLogout }){
         headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+token },
         body: JSON.stringify({ pergunta, contexto: contexto||null })
       });
+      if(res.status===429){
+        const j = await res.json().catch(()=>({}));
+        setLitE(j.detail || "Voce atingiu o limite de consultas de IA do plano gratuito. Assine o Premium para consultas ilimitadas.");
+        setLitL(false); return;
+      }
       if(!res.ok){
         const t = await res.text().catch(()=>"");
         setLitE("Erro "+res.status+(t?": "+t.slice(0,160):"")); setLitL(false); return;
