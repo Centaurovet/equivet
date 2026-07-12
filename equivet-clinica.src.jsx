@@ -46,6 +46,7 @@ const LS_PIX  = "ev_pix_v1";
 const LS_PRECOS = "ev_precos_v1";
 const LS_FAT = "ev_faturas_v1";
 const LS_EMIT = "ev_presc_emitidas_v1";
+const LS_VC  = "ev_vetcheck_v1";
 
 // Backend Railway (mesmo do chat). /literatura autentica via JWT do usuario (Supabase).
 const BACKEND_URL = "https://web-production-2f5bf.up.railway.app";
@@ -590,6 +591,430 @@ function NovaSenhaScreen({ onDone }) {
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// VETCHECK — Exame de compra (laudo + radiografias anexadas, sem interpretação)
+// Fluxo: rascunho no celular (formulário) → computador (anexa JPGs do HD +
+// conclusão + emissão/impressão). Rascunhos vivem no Supabase (upsert).
+// ============================================================================
+const escHtml = s => String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function comprimirImagem(file, maxDim=1600, qual=0.82){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const sc=Math.min(1,maxDim/Math.max(img.width,img.height));
+        const cv=document.createElement("canvas");
+        cv.width=Math.max(1,Math.round(img.width*sc)); cv.height=Math.max(1,Math.round(img.height*sc));
+        cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+        cv.toBlob(b=>b?res(b):rej(new Error("canvas vazio")),"image/jpeg",qual);
+      }catch(e){ rej(e); }
+      finally{ URL.revokeObjectURL(img.src); }
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(img.src); rej(new Error("imagem invalida")); };
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+const VC_ETAPAS = [
+  ["e1","1. Exame estatico","Inspecao geral, escore corporal, conformacao, palpacao de membros e dorso, cascos, olhos, boca/dentes, ausculta cardiaca e pulmonar em repouso..."],
+  ["e2","2. Exame dinamico","Passo e trote em linha reta e circulos, piso duro e macio, claudicacao (grau AAEP), qualidade dos andamentos..."],
+  ["e3","3. Testes de flexao e pinca de casco","Flexoes distais/proximais dos 4 membros e resposta, pinca de casco..."],
+  ["e4","4. Exame sob esforco e pos-esforco","Trabalho montado/na guia, recuperacao cardiaca e respiratoria, ruidos ao esforco..."],
+  ["e5","5. Exames complementares","Radiografias realizadas (projecoes), endoscopia, ultrassom, laboratorio — descreva o que foi feito..."],
+];
+
+const VC_INIT = () => ({
+  id:"vc_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7),
+  atendLocalId:null,
+  paciente:{nome:"",idade:"",sexo:"",pelagem:"",registro:""},
+  partes:{comprador:"",vendedor:"",finalidade:"",local:""},
+  exame:{e1:"",e2:"",e3:"",e4:"",e5:""},
+  radiografias:[], conclusao:"", textoLaudo:"", status:"rascunho",
+  emitidoEm:null, criadoEm:new Date().toISOString(), atualizadoEm:new Date().toISOString(),
+});
+
+function buildLaudoVC(l, crmv){
+  const p=l.paciente||{}, pt=l.partes||{}, ex=l.exame||{};
+  const o=[];
+  o.push("LAUDO DE EXAME DE ANIMAL PARA COMPRA (VETCHECK)");
+  o.push("");
+  o.push("IDENTIFICACAO DO ANIMAL");
+  o.push("Nome: "+(p.nome||"-"));
+  const id2=[p.idade&&"Idade: "+p.idade, p.sexo&&"Sexo: "+p.sexo, p.pelagem&&"Pelagem: "+p.pelagem].filter(Boolean);
+  if(id2.length) o.push(id2.join("  |  "));
+  if(p.registro) o.push("Registro/Microchip: "+p.registro);
+  o.push("");
+  o.push("PARTES");
+  o.push("Comprador: "+(pt.comprador||"-"));
+  o.push("Vendedor: "+(pt.vendedor||"-"));
+  if(pt.finalidade) o.push("Finalidade / uso pretendido: "+pt.finalidade);
+  if(pt.local) o.push("Local do exame: "+pt.local);
+  o.push("Data do exame: "+(l.criadoEm||"").slice(0,10).split("-").reverse().join("/"));
+  for(const [k,titulo] of VC_ETAPAS){
+    if(ex[k]&&ex[k].trim()){ o.push(""); o.push(titulo.toUpperCase()); o.push(ex[k].trim()); }
+  }
+  const rads=l.radiografias||[];
+  if(rads.length){
+    o.push("");
+    o.push("RADIOGRAFIAS ANEXADAS: "+rads.length+" imagem(ns)");
+    o.push(rads.map((r,i)=>"  "+(i+1)+". "+(r.projecao||"sem identificacao")).join("\n"));
+    o.push("As imagens anexas integram este laudo como documentacao, sem interpretacao adicional alem da descrita acima.");
+  }
+  o.push("");
+  o.push("CONCLUSAO / PARECER");
+  o.push((l.conclusao||"").trim()||"-");
+  o.push("");
+  o.push("Este laudo reflete as condicoes do animal identificadas no momento do exame e nao constitui garantia de higidez futura ou de desempenho.");
+  o.push("");
+  o.push("Emitido em: "+new Date().toLocaleDateString("pt-BR"));
+  o.push("Dr. Ricardo | CRMV-"+(crmv||"[UF] [No]"));
+  return o.join("\n");
+}
+
+function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
+  const [lista,setLista]     = useState(()=>lsGet(LS_VC,[]));
+  const [view,setView]       = useState("lista");   // 'lista' | 'form'
+  const [l,setL]             = useState(null);      // laudo em edicao
+  const [salvoVC,setSalvoVC] = useState("");        // feedback: '' | 'local' | 'nuvem'
+  const [upBusy,setUpBusy]   = useState(false);
+  const [syncBusy,setSyncBusy]=useState(false);
+  const [urls,setUrls]       = useState({});        // path -> signed url (miniaturas)
+  const [anexarImg,setAnexarImg] = useState(true);  // anexar imagens ao laudo impresso
+  const [confDelVC,setConfDelVC] = useState(null);  // id aguardando confirmacao de exclusao
+  const fileRef = React.useRef(null);
+
+  useEffect(()=>{ lsSet(LS_VC,lista); },[lista]);
+
+  // Botoes locais (mesmo visual do App)
+  const BtnVc = ({onClick,children,style,disabled}) => <button onClick={onClick} disabled={disabled} style={{background:disabled?"#3a3a3a":C.gold,color:disabled?C.muted:"#0f1117",border:"none",borderRadius:8,padding:"8px 15px",cursor:disabled?"default":"pointer",fontSize:13,fontWeight:700,fontFamily:"Georgia,serif",...style}}>{children}</button>;
+  const BtnVs = ({onClick,children,style}) => <button onClick={onClick} style={{background:"transparent",color:C.muted,border:"1px solid "+C.bord,borderRadius:8,padding:"6px 13px",cursor:"pointer",fontSize:13,fontFamily:"Georgia,serif",...style}}>{children}</button>;
+  const SecVc = ({children}) => <div style={{fontSize:10,color:C.gold,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:8,marginTop:16}}>{children}</div>;
+
+  const sbVcParaLocal = r => ({
+    id:r.local_id||"sb_"+r.id, atendLocalId:r.atendimento_local_id||null,
+    paciente:{nome:"",idade:"",sexo:"",pelagem:"",registro:"",...(r.paciente||{})},
+    partes:{comprador:"",vendedor:"",finalidade:"",local:"",...(r.partes||{})},
+    exame:{e1:"",e2:"",e3:"",e4:"",e5:"",...(r.exame||{})},
+    radiografias:r.radiografias||[], conclusao:r.conclusao||"",
+    textoLaudo:r.texto_laudo||"", status:r.status||"rascunho",
+    emitidoEm:r.emitido_em||null, criadoEm:r.criado_em||new Date().toISOString(),
+    atualizadoEm:r.atualizado_em||r.criado_em||"",
+  });
+
+  // Grava local + nuvem (upsert idempotente). Retorna true se a nuvem aceitou.
+  const persistir = async (nx) => {
+    const marcado={...nx, atualizadoEm:new Date().toISOString()};
+    setLista(prev=>{
+      const i=prev.findIndex(x=>x.id===marcado.id);
+      return (i>=0?prev.map(x=>x.id===marcado.id?marcado:x):[marcado,...prev]).slice(0,300);
+    });
+    if(!user) return false;
+    try{
+      const { error } = await supabase.from('vetcheck_laudos').upsert({
+        local_id:marcado.id, atendimento_local_id:marcado.atendLocalId,
+        veterinario_id:user.id, paciente:marcado.paciente, partes:marcado.partes,
+        exame:marcado.exame, radiografias:marcado.radiografias,
+        conclusao:marcado.conclusao||null, texto_laudo:marcado.textoLaudo||null,
+        status:marcado.status, emitido_em:marcado.emitidoEm,
+      },{ onConflict:'veterinario_id,local_id' });
+      if(error){ console.warn('VetCheck: nuvem falhou:', error.message); return false; }
+      return true;
+    }catch(e){ console.warn('VetCheck salvo so localmente:', e.message); return false; }
+  };
+
+  // Sync nuvem<->local: restaura rascunhos do celular; reenvia o que ficou offline.
+  const sincronizar = async () => {
+    if(!user) return;
+    setSyncBusy(true);
+    try{
+      const { data: rows, error } = await supabase.from('vetcheck_laudos')
+        .select('*').eq('veterinario_id', user.id)
+        .order('criado_em',{ascending:false}).limit(300);
+      if(error||!rows){ if(error) console.warn('Sync VetCheck: leitura falhou:', error.message); setSyncBusy(false); return; }
+      const locais = lsGet(LS_VC,[]);
+      const porId = new Map(locais.map(x=>[x.id,x]));
+      const idsNuvem = new Set(rows.map(r=>r.local_id).filter(Boolean));
+      let mudou=false;
+      for(const r of rows){
+        const lid=r.local_id||"sb_"+r.id;
+        const loc=porId.get(lid);
+        const nuvem=sbVcParaLocal(r);
+        if(!loc){ porId.set(lid,nuvem); mudou=true; }
+        else if((nuvem.atualizadoEm||"") > (loc.atualizadoEm||loc.criadoEm||"")){ porId.set(lid,nuvem); mudou=true; }
+      }
+      if(mudou){
+        const merged=[...porId.values()].sort((a,b)=>(b.criadoEm||"").localeCompare(a.criadoEm||"")).slice(0,300);
+        setLista(merged);
+      }
+      const pendentes = locais.filter(x=>!String(x.id).startsWith("sb_") && !idsNuvem.has(x.id));
+      for(const p of pendentes) await persistir(p);
+      if(pendentes.length) console.log('Sync: '+pendentes.length+' laudo(s) VetCheck reenviado(s) a nuvem.');
+    }catch(e){ console.warn('Sync VetCheck indisponivel:', e.message); }
+    setSyncBusy(false);
+  };
+  useEffect(()=>{ sincronizar(); },[user]);
+
+  // URLs assinadas para miniaturas (bucket privado)
+  const urlAssinada = async (path) => {
+    if(urls[path]) return urls[path];
+    try{
+      const { data, error } = await supabase.storage.from('radiografias').createSignedUrl(path,3600);
+      if(error||!data) return null;
+      setUrls(u=>({...u,[path]:data.signedUrl}));
+      return data.signedUrl;
+    }catch(e){ return null; }
+  };
+  useEffect(()=>{
+    if(!l) return;
+    (l.radiografias||[]).forEach(r=>{ if(!urls[r.path]) urlAssinada(r.path); });
+  },[l&&JSON.stringify((l.radiografias||[]).map(r=>r.path))]);
+
+  // Upload de JPGs (computador — HD Centauro). Comprime para ~1600px JPEG.
+  const uploadRads = async (files) => {
+    if(!files||!files.length||!l) return;
+    if(!user){ avisar("Faca login para anexar imagens."); return; }
+    setUpBusy(true);
+    const novas=[];
+    for(const f of Array.from(files)){
+      try{
+        const blob = await comprimirImagem(f);
+        const path = user.id+"/"+l.id+"/"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,6)+".jpg";
+        const { error } = await supabase.storage.from('radiografias').upload(path, blob, {contentType:'image/jpeg'});
+        if(error){ avisar("Falha no upload de "+f.name+": "+error.message); continue; }
+        novas.push({path, projecao:f.name.replace(/\.[^.]+$/,"")});
+      }catch(e){ avisar("Erro ao processar "+f.name); }
+    }
+    if(novas.length){
+      const nx={...l, radiografias:[...(l.radiografias||[]), ...novas]};
+      setL(nx); await persistir(nx);
+    }
+    setUpBusy(false);
+    if(fileRef.current) fileRef.current.value="";
+  };
+
+  const removerRad = async (r) => {
+    if(!l) return;
+    const nx={...l, radiografias:(l.radiografias||[]).filter(x=>x.path!==r.path)};
+    setL(nx); persistir(nx);
+    try{ supabase.storage.from('radiografias').remove([r.path]).then(()=>{},()=>{}); }catch(e){}
+  };
+
+  const setProjecao = (path, v) => {
+    const nx={...l, radiografias:(l.radiografias||[]).map(x=>x.path===path?{...x,projecao:v}:x)};
+    setL(nx);
+  };
+
+  const novo = () => {
+    const n=VC_INIT();
+    n.paciente={...n.paciente, nome:pacienteHeader||""};
+    n.atendLocalId=atendVinculoId||null;
+    setL(n); setView("form");
+  };
+
+  const abrir = (x) => { setL(JSON.parse(JSON.stringify(x))); setView("form"); };
+
+  const salvarRascunho = async () => {
+    if(!l) return;
+    if(!(l.paciente.nome||"").trim()){ avisar("Informe o nome do animal."); return; }
+    const ok = await persistir(l);
+    setSalvoVC(ok?"nuvem":"local"); setTimeout(()=>setSalvoVC(""),3500);
+  };
+
+  // Impressao: janela branca com o texto do laudo + grid de imagens (se pedido)
+  const imprimirLaudo = async (laudo, comImagens) => {
+    let imgs=[];
+    if(comImagens && (laudo.radiografias||[]).length){
+      for(const r of laudo.radiografias){
+        const u = await urlAssinada(r.path);
+        if(u) imgs.push({...r, url:u});
+      }
+      if(imgs.length < (laudo.radiografias||[]).length)
+        avisar("Atencao: "+((laudo.radiografias||[]).length-imgs.length)+" imagem(ns) nao carregaram para a impressao.");
+    }
+    const texto = laudo.textoLaudo || buildLaudoVC(laudo, crmv);
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Laudo VetCheck - '+escHtml((laudo.paciente||{}).nome||"")+'</title><style>'
+      +'body{font-family:Georgia,serif;color:#111;margin:40px;line-height:1.6;background:#fff}'
+      +'pre{white-space:pre-wrap;font-family:Georgia,serif;font-size:13px;margin:0}'
+      +'h3{font-size:14px;margin:26px 0 10px;border-top:1px solid #999;padding-top:14px}'
+      +'.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}'
+      +'figure{margin:0;page-break-inside:avoid}'
+      +'img{width:100%;border:1px solid #bbb;display:block}'
+      +'figcaption{font-size:11px;color:#444;margin-top:4px;text-align:center}'
+      +'@media print{body{margin:14mm}}'
+      +'</style></head><body><pre>'+escHtml(texto)+'</pre>'
+      +(imgs.length?'<h3>RADIOGRAFIAS ANEXADAS ('+imgs.length+')</h3><div class="grid">'
+        +imgs.map((i,n)=>'<figure><img src="'+i.url+'"><figcaption>'+(n+1)+'. '+escHtml(i.projecao||"sem identificacao")+'</figcaption></figure>').join("")
+        +'</div>':"")
+      +'</body></html>';
+    const w=window.open("","_blank");
+    if(!w){ avisar("Permita pop-ups para imprimir o laudo."); return; }
+    w.document.write(html); w.document.close();
+    setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, imgs.length?900:300);
+  };
+
+  const emitir = async () => {
+    if(!l) return;
+    if(!(l.paciente.nome||"").trim()){ avisar("Informe o nome do animal."); return; }
+    if(!(l.conclusao||"").trim()){ avisar("Escreva a conclusao/parecer antes de emitir."); return; }
+    const texto = buildLaudoVC(l, crmv);
+    const nx={...l, textoLaudo:texto, status:"emitido", emitidoEm:new Date().toISOString()};
+    setL(nx);
+    await persistir(nx);
+    imprimirLaudo(nx, anexarImg);
+  };
+
+  const excluirVC = async (x) => {
+    setLista(lista.filter(y=>y.id!==x.id));
+    setConfDelVC(null);
+    if(view==="form"&&l&&l.id===x.id){ setL(null); setView("lista"); }
+    try{
+      supabase.from('vetcheck_laudos').delete()
+        .eq('veterinario_id',user.id).eq('local_id',x.id).then(()=>{},()=>{});
+      const paths=(x.radiografias||[]).map(r=>r.path);
+      if(paths.length) supabase.storage.from('radiografias').remove(paths).then(()=>{},()=>{});
+    }catch(e){}
+  };
+
+  const upPac = (k,v) => setL({...l, paciente:{...l.paciente,[k]:v}});
+  const upPar = (k,v) => setL({...l, partes:{...l.partes,[k]:v}});
+  const upEx  = (k,v) => setL({...l, exame:{...l.exame,[k]:v}});
+
+  const fmtData = s => (s||"").slice(0,10).split("-").reverse().join("/");
+
+  // ============================== RENDER ==============================
+  if(view==="form"&&l){
+    const emitido = l.status==="emitido";
+    return <div>
+      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+        <BtnVs onClick={()=>{setView("lista");setL(null);}}>Voltar</BtnVs>
+        <div style={{flex:1,fontSize:15,fontWeight:700,color:C.gold}}>
+          🐴 VetCheck — {l.paciente.nome||"novo exame"}
+          {emitido&&<span style={{marginLeft:8,fontSize:10,fontWeight:700,color:C.green,background:"#1a2e1a",border:"1px solid #3a6a3a",borderRadius:6,padding:"2px 7px",letterSpacing:"0.05em"}}>EMITIDO {fmtData(l.emitidoEm)}</span>}
+          {!emitido&&<span style={{marginLeft:8,fontSize:10,fontWeight:700,color:"#e0a040",background:"#2e2418",border:"1px solid #8a6a3a",borderRadius:6,padding:"2px 7px",letterSpacing:"0.05em"}}>RASCUNHO</span>}
+        </div>
+      </div>
+      {l.atendLocalId&&<div style={{fontSize:11,color:"#6a9abf",marginBottom:10}}>🔗 Vinculado ao atendimento {l.atendLocalId}</div>}
+
+      <SecVc>Identificacao do animal</SecVc>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:10,marginBottom:4}}>
+        <Field label="Nome"><input value={l.paciente.nome} onChange={e=>upPac("nome",e.target.value)} style={IS}/></Field>
+        <Field label="Idade"><input value={l.paciente.idade} onChange={e=>upPac("idade",e.target.value)} placeholder="Ex: 6 anos" style={IS}/></Field>
+        <Field label="Sexo"><select value={l.paciente.sexo} onChange={e=>upPac("sexo",e.target.value)} style={IS}><option value="">—</option><option>Macho inteiro</option><option>Macho castrado</option><option>Femea</option></select></Field>
+        <Field label="Pelagem"><input value={l.paciente.pelagem} onChange={e=>upPac("pelagem",e.target.value)} placeholder="Tordilha, castanha..." style={IS}/></Field>
+        <Field label="Registro / Microchip"><input value={l.paciente.registro} onChange={e=>upPac("registro",e.target.value)} style={IS}/></Field>
+      </div>
+
+      <SecVc>Partes e finalidade</SecVc>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(180px,1fr))",gap:10,marginBottom:4}}>
+        <Field label="Comprador"><input value={l.partes.comprador} onChange={e=>upPar("comprador",e.target.value)} style={IS}/></Field>
+        <Field label="Vendedor"><input value={l.partes.vendedor} onChange={e=>upPar("vendedor",e.target.value)} style={IS}/></Field>
+        <Field label="Finalidade / uso pretendido"><input value={l.partes.finalidade} onChange={e=>upPar("finalidade",e.target.value)} placeholder="Salto, laco, lazer, reproducao..." style={IS}/></Field>
+        <Field label="Local do exame"><input value={l.partes.local} onChange={e=>upPar("local",e.target.value)} placeholder="Haras, hipica..." style={IS}/></Field>
+      </div>
+
+      {VC_ETAPAS.map(([k,titulo,ph])=>(
+        <div key={k}>
+          <SecVc>{titulo}</SecVc>
+          <textarea rows={3} value={l.exame[k]} onChange={e=>upEx(k,e.target.value)} placeholder={ph}
+            style={{...IS,resize:"vertical",minHeight:70,lineHeight:1.55}}/>
+        </div>
+      ))}
+
+      <SecVc>Radiografias anexadas ({(l.radiografias||[]).length})</SecVc>
+      <div style={{fontSize:11,color:C.dim,marginBottom:8,lineHeight:1.5}}>
+        Anexe no computador os JPGs salvos no HD (Centauro). As imagens entram no laudo como documentacao, sem interpretacao. Sao comprimidas (~1600px) e guardadas na nuvem.
+      </div>
+      <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
+        <input ref={fileRef} type="file" accept="image/jpeg,image/png" multiple
+          onChange={e=>uploadRads(e.target.files)} style={{display:"none"}}/>
+        <BtnVs onClick={()=>fileRef.current&&fileRef.current.click()} style={{color:C.gold,borderColor:C.gold}}>
+          {upBusy?"⏳ Enviando...":"📎 Anexar imagens (JPG)"}
+        </BtnVs>
+      </div>
+      {(l.radiografias||[]).length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:6}}>
+        {(l.radiografias||[]).map((r,i)=>(
+          <div key={r.path} style={{background:C.card,border:"1px solid "+C.bord,borderRadius:8,padding:8}}>
+            {urls[r.path]
+              ? <img src={urls[r.path]} alt={r.projecao||("radiografia "+(i+1))} style={{width:"100%",borderRadius:5,display:"block",marginBottom:6}}/>
+              : <div style={{height:90,display:"flex",alignItems:"center",justifyContent:"center",color:C.dim,fontSize:11,background:"#0f1320",borderRadius:5,marginBottom:6}}>carregando…</div>}
+            <input value={r.projecao||""} onChange={e=>setProjecao(r.path,e.target.value)}
+              onBlur={()=>persistir(l)} placeholder={"Projecao "+(i+1)+" (ex: LM boleto AE)"}
+              style={{...IS,fontSize:11,padding:"5px 8px",marginBottom:5}}/>
+            <button onClick={()=>removerRad(r)} style={{background:"none",border:"none",color:"#c07050",cursor:"pointer",fontSize:11,padding:0}}>remover</button>
+          </div>
+        ))}
+      </div>}
+
+      <SecVc>Conclusao / parecer</SecVc>
+      <div style={{fontSize:11,color:C.dim,marginBottom:6,lineHeight:1.5}}>
+        Parecer de risco quanto a finalidade pretendida — descreva achados e relevancia; evite "aprovado/reprovado".
+      </div>
+      <textarea rows={5} value={l.conclusao} onChange={e=>setL({...l,conclusao:e.target.value})}
+        placeholder="Ex: Ao exame, o animal apresentou... Os achados radiograficos anexos documentam... Considerando a finalidade declarada, o risco e considerado baixo/moderado/alto quanto a..."
+        style={{...IS,resize:"vertical",minHeight:110,lineHeight:1.6}}/>
+
+      <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:C.muted,margin:"14px 0",cursor:"pointer"}}>
+        <input type="checkbox" checked={anexarImg} onChange={e=>setAnexarImg(e.target.checked)} style={{accentColor:C.gold,width:16,height:16}}/>
+        Anexar as radiografias ao laudo impresso
+      </label>
+
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}>
+        <BtnVs onClick={salvarRascunho} style={{flex:1,minWidth:170,padding:"12px",color:C.gold,borderColor:C.gold,textAlign:"center"}}>
+          {salvoVC?(salvoVC==="nuvem"?"✓ Salvo (local + nuvem)":"✓ Salvo (so local — sem conexao)"):"💾 Salvar rascunho"}
+        </BtnVs>
+        <BtnVc onClick={emitir} style={{flex:1,minWidth:170,padding:"12px"}}>
+          {emitido?"🖨 Re-emitir e imprimir":"📋 Emitir laudo e imprimir"}
+        </BtnVc>
+        {emitido&&<BtnVs onClick={()=>imprimirLaudo(l,anexarImg)} style={{padding:"12px"}}>🖨 Imprimir novamente</BtnVs>}
+      </div>
+      {emitido&&l.textoLaudo&&<details style={{marginTop:14}}>
+        <summary style={{color:C.gold,fontSize:12,cursor:"pointer"}}>Ver texto emitido</summary>
+        <pre style={{background:"#0f1320",padding:12,borderRadius:8,whiteSpace:"pre-wrap",fontSize:12,color:C.text,fontFamily:"'Courier New',monospace",lineHeight:1.5,marginTop:8}}>{l.textoLaudo}</pre>
+      </details>}
+    </div>;
+  }
+
+  // ---- LISTA ----
+  return <div>
+    <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:10,padding:14,marginBottom:14}}>
+      <div style={{fontSize:13,fontWeight:700,color:C.gold,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>🐴 VetCheck — Exame de compra</div>
+      <div style={{fontSize:12,color:C.dim,lineHeight:1.6,marginBottom:12}}>
+        Capture o exame no celular (rascunho salvo na nuvem) e finalize no computador: anexe as radiografias em JPG, escreva a conclusao e emita o laudo para impressao.
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <BtnVc onClick={novo}>➕ Novo VetCheck{pacienteHeader?" — "+pacienteHeader:""}</BtnVc>
+        <BtnVs onClick={sincronizar}>{syncBusy?"⏳ Sincronizando…":"↻ Atualizar da nuvem"}</BtnVs>
+      </div>
+      {atendVinculoId&&<div style={{fontSize:11,color:"#6a9abf",marginTop:8}}>🔗 Novo exame sera vinculado ao atendimento atual.</div>}
+    </div>
+
+    {lista.length===0&&<div style={{textAlign:"center",color:C.dim,padding:26,fontSize:13}}>Nenhum laudo VetCheck ainda.</div>}
+    {lista.map(x=>{
+      const nR=(x.radiografias||[]).length;
+      return <div key={x.id} style={{background:C.card,border:"1px solid "+(x.status==="emitido"?C.bord:"#8a6a3a"),borderRadius:8,padding:"10px 12px",marginBottom:7,display:"flex",alignItems:"center",gap:10}}>
+        <div style={{flex:1,minWidth:0,cursor:"pointer"}} onClick={()=>abrir(x)}>
+          <div style={{fontSize:13,fontWeight:600,color:C.text}}>🐴 {(x.paciente||{}).nome||"-"}
+            <span style={{marginLeft:8,fontSize:10,fontWeight:700,letterSpacing:"0.05em",color:x.status==="emitido"?C.green:"#e0a040"}}>{x.status==="emitido"?"EMITIDO":"RASCUNHO"}</span>
+          </div>
+          <div style={{fontSize:11,color:C.dim}}>
+            {fmtData(x.criadoEm)} · {nR} imagem{nR===1?"":"s"}
+            {(x.partes||{}).comprador?" · comprador: "+(x.partes||{}).comprador:""}
+            {x.atendLocalId?<span style={{color:"#6a9abf"}}> · 🔗 atendimento</span>:""}
+          </div>
+        </div>
+        <BtnVs onClick={()=>abrir(x)} style={{fontSize:11,padding:"5px 10px"}}>Abrir</BtnVs>
+        {confDelVC===x.id
+          ? <>
+              <button onClick={()=>excluirVC(x)} style={{background:"#c0654a",color:"#fff",border:"none",borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:11,fontWeight:700}}>Confirmar</button>
+              <button onClick={()=>setConfDelVC(null)} style={{background:"none",border:"1px solid "+C.bord,color:C.muted,borderRadius:6,padding:"5px 9px",cursor:"pointer",fontSize:11}}>Nao</button>
+            </>
+          : <button onClick={()=>setConfDelVC(x.id)} style={{background:"none",border:"none",color:"#7a3a3a",cursor:"pointer",fontSize:15,padding:"0 2px"}}>x</button>}
+      </div>;
+    })}
+  </div>;
 }
 
 // ============================================================================
@@ -1379,7 +1804,7 @@ function App({ user, onLogout }){
           <input placeholder="Proprietario" value={prop} onChange={e=>setProp(e.target.value)} style={{...IS,width:"auto",flex:1,minWidth:140,fontSize:13}}/>
         </div>
         <div style={{display:"flex",overflowX:"auto"}}>
-          {[["atendimento","Atendimento"],["prescricoes","Prescricoes"],["cobranca","Cobranca"],["literatura","Literatura"]].map(([a,l])=>(
+          {[["atendimento","Atendimento"],["prescricoes","Prescricoes"],["cobranca","Cobranca"],["vetcheck","VetCheck"],["literatura","Literatura"]].map(([a,l])=>(
             <button key={a} onClick={()=>{setAba(a);if(a!=="prescricoes")setTela("lista");}} style={{background:aba===a?C.gold:"transparent",color:aba===a?"#0f1117":C.muted,border:"none",padding:"8px 16px",cursor:"pointer",fontSize:12,fontWeight:700,textTransform:"uppercase",borderRadius:"6px 6px 0 0",whiteSpace:"nowrap"}}>{l}</button>
           ))}
         </div>
@@ -2067,6 +2492,9 @@ function App({ user, onLogout }){
             Ferramenta de apoio a decisao. Sempre valide contra o exame clinico presencial.
           </div>
         </div>}
+
+        {/* ====================== ABA VETCHECK ====================== */}
+        {aba==="vetcheck"&&<VetCheckTab user={user} pacienteHeader={paciente.trim()} crmv={crmv} atendVinculoId={atendVinculoId} avisar={avisar}/>}
 
       </div>
 
