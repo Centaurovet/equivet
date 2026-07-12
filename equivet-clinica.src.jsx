@@ -45,6 +45,7 @@ const LS_CRMV = "ev_crmv_v1";
 const LS_PIX  = "ev_pix_v1";
 const LS_PRECOS = "ev_precos_v1";
 const LS_FAT = "ev_faturas_v1";
+const LS_EMIT = "ev_presc_emitidas_v1";
 
 // Backend Railway (mesmo do chat). /literatura autentica via JWT do usuario (Supabase).
 const BACKEND_URL = "https://web-production-2f5bf.up.railway.app";
@@ -654,6 +655,11 @@ function App({ user, onLogout }){
   const [faturas,setFaturas]      = useState([]);
   const [fatGerada,setFatGerada]  = useState(false);
 
+  // ---- PRESCRIÇÕES EMITIDAS (registro do documento final) ----
+  const [emitidas,setEmitidas]    = useState([]);
+  const [emitOk,setEmitOk]        = useState(false);   // feedback pós-emissão
+  const [emitAberta,setEmitAberta]= useState(null);    // emissão expandida na lista
+
   // ---- EXAMES (integração EquiVet Lab) ----
   const [atendVinculoId,setAtendVinculoId] = useState(null); // local_id do atendimento atual
   const [exames,setExames]        = useState([]);            // exames vinculados a esse atendimento
@@ -712,10 +718,12 @@ function App({ user, onLogout }){
     setAtend(lsGet(LS3,[]));
     setBaseTags(lsGet(LS_TAGS,{}));
     setFaturas(lsGet(LS_FAT,[]));
+    setEmitidas(lsGet(LS_EMIT,[]));
   },[]);
 
   useEffect(()=>{ lsSet(LS3,atendimentos); },[atendimentos]);
   useEffect(()=>{ lsSet(LS_FAT,faturas); },[faturas]);
+  useEffect(()=>{ lsSet(LS_EMIT,emitidas); },[emitidas]);
 
   // ---- SYNC COM A NUVEM (Supabase) ----
   const sbParaLocal = r => ({
@@ -812,6 +820,50 @@ function App({ user, onLogout }){
     })();
   },[user]);
 
+  // ---- SYNC DE PRESCRIÇÕES EMITIDAS COM A NUVEM (Supabase) ----
+  const sbEmitParaLocal = r => ({
+    id: r.local_id || "sb_"+r.id,
+    atendLocalId: r.atendimento_local_id || null,
+    paciente: r.paciente_nome||"", prop: r.proprietario_nome||"",
+    titulo: r.diagnostico_titulo||"", texto: r.texto||"",
+    criadoEm: r.criado_em||new Date().toISOString(),
+  });
+
+  useEffect(()=>{
+    if(!user) return;
+    (async()=>{
+      try{
+        const { data: rows, error } = await supabase.from('prescricoes_emitidas')
+          .select('*').eq('veterinario_id', user.id)
+          .order('criado_em',{ascending:false}).limit(500);
+        if(error||!rows){ if(error) console.warn('Sync emissões: leitura falhou:', error.message); return; }
+        const locais = lsGet(LS_EMIT,[]);
+        const porId  = new Map(locais.map(e=>[e.id,e]));
+        const idsNuvem = new Set(rows.map(r=>r.local_id).filter(Boolean));
+        let mudou = false;
+        // nuvem → local: restaura emissões feitas em outro aparelho
+        for(const r of rows){
+          const lid = r.local_id || "sb_"+r.id;
+          if(!porId.has(lid)){ porId.set(lid, sbEmitParaLocal(r)); mudou = true; }
+        }
+        if(mudou){
+          const merged=[...porId.values()].sort((a,b)=>(b.criadoEm||"").localeCompare(a.criadoEm||"")).slice(0,500);
+          setEmitidas(merged);
+        }
+        // local → nuvem: reenvia o que ficou offline
+        const pendentes = locais.filter(e=>!String(e.id).startsWith("sb_") && !idsNuvem.has(e.id));
+        for(const e of pendentes){
+          await supabase.from('prescricoes_emitidas').insert({
+            local_id:e.id, atendimento_local_id:e.atendLocalId||null,
+            paciente_nome:e.paciente||"-", proprietario_nome:e.prop||null,
+            diagnostico_titulo:e.titulo||null, texto:e.texto||"",
+            veterinario_id:user.id });
+        }
+        if(pendentes.length) console.log('Sync: '+pendentes.length+' emissão(ões) reenviada(s) à nuvem.');
+      }catch(e){ console.warn('Sync emissões indisponível:', e.message); }
+    })();
+  },[user]);
+
   useEffect(()=>{ lsSet(LS_TAGS,baseTags); },[baseTags]);
   useEffect(()=>{
     lsSet(LS_CRMV,crmv);
@@ -904,6 +956,34 @@ function App({ user, onLogout }){
   };
 
   const copiar = () => { copyToClipboard(texto); setCopiado(true); setTimeout(()=>setCopiado(false),2000); };
+
+  // === EMITIR PRESCRIÇÃO (registra o documento final) ===
+  const emitirPrescricao = async () => {
+    if(!aberta || !texto.trim()){ avisar("Nada para emitir."); return; }
+    const reg = {
+      id: newId(),
+      atendLocalId: atendVinculoId || null,       // vinculada ao atendimento atual ou avulsa
+      paciente: paciente.trim() || "-",
+      prop: prop.trim(),
+      titulo: aberta.titulo,
+      texto,
+      criadoEm: new Date().toISOString(),
+    };
+    // 1. Local (sempre — funciona offline)
+    setEmitidas([reg,...emitidas].slice(0,500));
+    setEmitOk(true); setTimeout(()=>setEmitOk(false),4000);
+    // 2. Nuvem (em paralelo — não bloqueia se falhar; o sync no login reenvia)
+    if(user){
+      try{
+        const { error } = await supabase.from('prescricoes_emitidas').insert({
+          local_id: reg.id, atendimento_local_id: reg.atendLocalId,
+          paciente_nome: reg.paciente, proprietario_nome: reg.prop||null,
+          diagnostico_titulo: reg.titulo, texto: reg.texto,
+          veterinario_id: user.id });
+        if(error) console.warn('Emissão: gravação na nuvem falhou:', error.message);
+      }catch(e){ console.warn('Emissão: nuvem indisponível:', e.message); }
+    }
+  };
 
   // === SYNC DE PROTOCOLOS "MEU" COM A NUVEM (prescricoes_base) ===
   const upsertPrescNuvem = async reg => {
@@ -1648,6 +1728,31 @@ function App({ user, onLogout }){
               </div>}
             </div>;
           })}
+
+          {/* PRESCRIÇÕES EMITIDAS — vinculadas a este atendimento */}
+          {atendVinculoId&&(()=>{
+            const doAtend = emitidas.filter(e=>e.atendLocalId===atendVinculoId);
+            return <>
+              <Sec>Prescrições emitidas</Sec>
+              {doAtend.length===0&&<div style={{color:C.dim,fontSize:12,padding:"6px 0"}}>Nenhuma prescrição emitida neste atendimento. Use "📋 Emitir prescrição" no editor.</div>}
+              {doAtend.map(em=>{
+                const aberto=emitAberta===em.id;
+                return <div key={em.id} style={{background:C.card,border:"1px solid "+C.bord,borderRadius:8,padding:"9px 12px",marginBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer"}} onClick={()=>setEmitAberta(aberto?null:em.id)}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.text}}>📋 {em.titulo||"Prescrição"}</div>
+                      <div style={{fontSize:11,color:C.dim}}>{(em.criadoEm||"").slice(0,10).split("-").reverse().join("/")} · {em.paciente}</div>
+                    </div>
+                    <span style={{color:C.muted,fontSize:13}}>{aberto?"▲":"▼"}</span>
+                  </div>
+                  {aberto&&<div style={{marginTop:8,borderTop:"1px solid "+C.bord,paddingTop:8}}>
+                    <div style={{fontSize:12.5,color:C.text,whiteSpace:"pre-wrap",lineHeight:1.55,fontFamily:"'Courier New',monospace"}}>{em.texto}</div>
+                    <BtnS onClick={()=>copyToClipboard(em.texto)} style={{marginTop:8,fontSize:11,padding:"4px 10px"}}>Copiar</BtnS>
+                  </div>}
+                </div>;
+              })}
+            </>;
+          })()}
         </div>}
 
         {/* ====================== ABA PRESCRICOES (LISTA) ====================== */}
@@ -1735,8 +1840,12 @@ function App({ user, onLogout }){
               <BtnS onClick={()=>setCD(false)}>Nao</BtnS>
             </>}
             <BtnP onClick={copiar}>{copiado?"Copiado!":"Copiar"}</BtnP>
+            <BtnP onClick={emitirPrescricao} style={{background:"#2a4a2a",color:C.green,border:"1px solid #3a6a3a"}}>📋 Emitir prescrição</BtnP>
           </div>
           {salvo&&<div style={{background:"#1a2e1a",border:"1px solid #3a6a3a",borderRadius:8,padding:"8px 12px",marginBottom:8,fontSize:13,color:C.green}}>Modelo salvo com sucesso!</div>}
+          {emitOk&&<div style={{background:"#1a2e1a",border:"1px solid #3a6a3a",borderRadius:8,padding:"8px 12px",marginBottom:8,fontSize:13,color:C.green}}>
+            ✓ Prescrição emitida e registrada {atendVinculoId?"— vinculada ao atendimento atual":"(avulsa — sem atendimento vinculado)"}
+          </div>}
 
           {/* Editor de tags */}
           <div style={{background:C.card,border:"1px solid "+C.bord,borderRadius:8,padding:"10px 12px",marginBottom:8}}>
