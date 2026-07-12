@@ -1500,6 +1500,7 @@ function App({
     itens: r.itens || [],
     mensagem: r.mensagem || "",
     valorTotal: parseFloat(r.valor_total) || 0,
+    atendLocalId: r.atendimento_local_id || null,
     status: r.status || "aberta",
     pagoEm: r.pago_em || null,
     criadoEm: r.criado_em || new Date().toISOString()
@@ -1563,6 +1564,7 @@ function App({
             valor_total: f.valorTotal,
             status: f.status || "aberta",
             pago_em: f.pagoEm || null,
+            atendimento_local_id: f.atendLocalId || null,
             veterinario_id: user.id
           });
         }
@@ -2031,6 +2033,8 @@ function App({
       itens: itensFatura(),
       mensagem: msg(),
       valorTotal: total,
+      atendLocalId: atendVinculoId || null,
+      // vínculo com o atendimento atual (ou avulsa)
       status: "aberta",
       pagoEm: null,
       criadoEm: new Date().toISOString()
@@ -2056,6 +2060,7 @@ function App({
         mensagem: f.mensagem,
         valor_total: f.valorTotal,
         status: "aberta",
+        atendimento_local_id: f.atendLocalId,
         veterinario_id: user.id
       });
       if (error) console.warn('Fatura: salvar na nuvem falhou:', error.message);
@@ -4453,7 +4458,36 @@ function App({
           padding: "4px 10px"
         }
       }, "Copiar")));
-    }));
+    }), (() => {
+      const fats = faturas.filter(f => f.atendLocalId === atendVinculoId);
+      if (!fats.length) return null;
+      return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Sec, null, "Faturas deste atendimento"), fats.map(f => /*#__PURE__*/React.createElement("div", {
+        key: f.id,
+        style: {
+          background: C.card,
+          border: "1px solid " + (f.status === "aberta" ? "#8a6a3a" : C.bord),
+          borderRadius: 8,
+          padding: "8px 12px",
+          marginBottom: 6,
+          display: "flex",
+          alignItems: "center",
+          gap: 10
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          flex: 1,
+          fontSize: 12,
+          color: C.text
+        }
+      }, "💰 ", (f.dataEmissao || "").split("-").reverse().join("/"), " · R$ ", (f.valorTotal || 0).toFixed(2).replace(".", ",")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.05em",
+          color: f.status === "paga" ? C.green : "#e0a040"
+        }
+      }, f.status === "paga" ? "PAGA" : "EM ABERTO"))));
+    })());
   })()), aba === "prescricoes" && tela === "lista" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -5442,7 +5476,14 @@ function App({
       fontWeight: 700,
       fontFamily: "Georgia,serif"
     }
-  }, fatGerada ? "✓ Fatura gerada — em aberto" : "Gerar fatura (fica em aberto ate marcar como paga)")), faturas.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Sec, null, "Faturas (", faturas.filter(f => f.status === "aberta").length, " em aberto)"), faturas.map(f => /*#__PURE__*/React.createElement("div", {
+  }, fatGerada ? "✓ Fatura gerada — em aberto" : "Gerar fatura (fica em aberto ate marcar como paga)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: atendVinculoId ? "#6a9abf" : C.dim,
+      marginTop: 6,
+      textAlign: "center"
+    }
+  }, atendVinculoId ? "🔗 Sera vinculada ao atendimento atual de " + (paciente || "—") : "Sem atendimento ativo — a fatura sera avulsa. Salve o atendimento antes para vincular.")), faturas.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Sec, null, "Faturas (", faturas.filter(f => f.status === "aberta").length, " em aberto)"), faturas.map(f => /*#__PURE__*/React.createElement("div", {
     key: f.id,
     style: {
       background: C.card,
@@ -5473,7 +5514,11 @@ function App({
       fontSize: 11,
       color: C.dim
     }
-  }, (f.dataEmissao || "").split("-").reverse().join("/"), f.prop ? " · " + f.prop : "")), /*#__PURE__*/React.createElement("div", {
+  }, (f.dataEmissao || "").split("-").reverse().join("/"), f.prop ? " · " + f.prop : "", f.atendLocalId ? /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: "#6a9abf"
+    }
+  }, " · 🔗 atendimento") : "")), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "right"
     }

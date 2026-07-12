@@ -772,6 +772,7 @@ function App({ user, onLogout }){
     id: r.local_id || "sb_"+r.id,
     dataEmissao: r.data_emissao, paciente: r.paciente_nome||"", prop: r.proprietario_nome||"",
     itens: r.itens||[], mensagem: r.mensagem||"", valorTotal: parseFloat(r.valor_total)||0,
+    atendLocalId: r.atendimento_local_id||null,
     status: r.status||"aberta", pagoEm: r.pago_em||null, criadoEm: r.criado_em||new Date().toISOString(),
   });
 
@@ -813,6 +814,7 @@ function App({ user, onLogout }){
             local_id:f.id, data_emissao:f.dataEmissao, paciente_nome:f.paciente||"-",
             proprietario_nome:f.prop||null, itens:f.itens||[], mensagem:f.mensagem||"",
             valor_total:f.valorTotal, status:f.status||"aberta", pago_em:f.pagoEm||null,
+            atendimento_local_id:f.atendLocalId||null,
             veterinario_id:user.id });
         }
         if(pendentes.length) console.log('Sync: '+pendentes.length+' fatura(s) reenviada(s) à nuvem.');
@@ -1100,6 +1102,7 @@ function App({ user, onLogout }){
       id:"ft_"+Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,7),
       dataEmissao: todayISO(), paciente: paciente.trim()||"-", prop: prop.trim(),
       itens: itensFatura(), mensagem: msg(), valorTotal: total,
+      atendLocalId: atendVinculoId || null,   // vínculo com o atendimento atual (ou avulsa)
       status:"aberta", pagoEm:null, criadoEm:new Date().toISOString(),
     };
     setFaturas([f,...faturas].slice(0,500));
@@ -1109,7 +1112,8 @@ function App({ user, onLogout }){
       const { error } = await supabase.from('faturas').insert({
         local_id:f.id, data_emissao:f.dataEmissao, paciente_nome:f.paciente,
         proprietario_nome:f.prop||null, itens:f.itens, mensagem:f.mensagem,
-        valor_total:f.valorTotal, status:"aberta", veterinario_id:user.id });
+        valor_total:f.valorTotal, status:"aberta",
+        atendimento_local_id:f.atendLocalId, veterinario_id:user.id });
       if(error) console.warn('Fatura: salvar na nuvem falhou:', error.message);
     }catch(e){ console.warn('Fatura salva só localmente:', e.message); }
   };
@@ -1751,6 +1755,19 @@ function App({ user, onLogout }){
                   </div>}
                 </div>;
               })}
+              {(()=>{
+                const fats = faturas.filter(f=>f.atendLocalId===atendVinculoId);
+                if(!fats.length) return null;
+                return <>
+                  <Sec>Faturas deste atendimento</Sec>
+                  {fats.map(f=>(
+                    <div key={f.id} style={{background:C.card,border:"1px solid "+(f.status==="aberta"?"#8a6a3a":C.bord),borderRadius:8,padding:"8px 12px",marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
+                      <div style={{flex:1,fontSize:12,color:C.text}}>💰 {(f.dataEmissao||"").split("-").reverse().join("/")} · R$ {(f.valorTotal||0).toFixed(2).replace(".",",")}</div>
+                      <div style={{fontSize:10,fontWeight:700,letterSpacing:"0.05em",color:f.status==="paga"?C.green:"#e0a040"}}>{f.status==="paga"?"PAGA":"EM ABERTO"}</div>
+                    </div>
+                  ))}
+                </>;
+              })()}
             </>;
           })()}
         </div>}
@@ -1985,6 +2002,9 @@ function App({ user, onLogout }){
               style={{width:"100%",padding:"12px",marginTop:8,background:fatGerada?"#2a4a2a":"transparent",color:fatGerada?C.green:C.gold,border:"1px solid "+(fatGerada?"#3a6a3a":C.gold),borderRadius:8,cursor:"pointer",fontSize:13,fontWeight:700,fontFamily:"Georgia,serif"}}>
               {fatGerada?"✓ Fatura gerada — em aberto":"Gerar fatura (fica em aberto ate marcar como paga)"}
             </button>
+            <div style={{fontSize:11,color:atendVinculoId?"#6a9abf":C.dim,marginTop:6,textAlign:"center"}}>
+              {atendVinculoId?"🔗 Sera vinculada ao atendimento atual de "+(paciente||"—"):"Sem atendimento ativo — a fatura sera avulsa. Salve o atendimento antes para vincular."}
+            </div>
           </>}
 
           {faturas.length>0&&<>
@@ -1993,7 +2013,7 @@ function App({ user, onLogout }){
               <div key={f.id} style={{background:C.card,border:"1px solid "+(f.status==="aberta"?"#8a6a3a":C.bord),borderRadius:8,padding:"9px 12px",marginBottom:6,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{f.paciente||"-"}</div>
-                  <div style={{fontSize:11,color:C.dim}}>{(f.dataEmissao||"").split("-").reverse().join("/")}{f.prop?" · "+f.prop:""}</div>
+                  <div style={{fontSize:11,color:C.dim}}>{(f.dataEmissao||"").split("-").reverse().join("/")}{f.prop?" · "+f.prop:""}{f.atendLocalId?<span style={{color:"#6a9abf"}}> · 🔗 atendimento</span>:""}</div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:14,fontWeight:700,color:C.gold}}>R$ {(f.valorTotal||0).toFixed(2).replace(".",",")}</div>
