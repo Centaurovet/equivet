@@ -120,7 +120,7 @@ Pergunta (PT) → Cohere embed (search_query) → pgvector match_documents → c
 
 **Repo:** `Centaurovet/equivet` · **URL:** `centaurovet.com.br/equivet/equivet-clinica.html`
 **Stack:** React 18 UMD + Babel standalone + `@supabase/supabase-js@2`, sem bundler.
-**Fonte:** `equivet-clinica.src.jsx` → transpilar (`@babel/preset-react`, runtime clássico) → `equivet-clinica.js`. **SW:** `sw.js` CACHE `equivet-v19` (bump a cada release).
+**Fonte:** `equivet-clinica.src.jsx` → transpilar (`@babel/preset-react`, runtime clássico) → `equivet-clinica.js`. **SW:** `sw.js` CACHE `equivet-v22` (bump a cada release).
 **Tema:** dark + gold (`#0f1117`/`#d4a96a`), Georgia serif.
 
 ### Chaves no frontend (`equivet-clinica.html`)
@@ -129,8 +129,8 @@ Pergunta (PT) → Cohere embed (search_query) → pgvector match_documents → c
 ### As 4 abas
 | ID | Função |
 |----|--------|
-| `atendimento` | Anamnese, exame (focado/completo), módulos por queixa → `buildProntuario()`; seção **Exames laboratoriais** (integração Lab, ver abaixo) |
-| `prescricoes` | Catálogo (6 bases sistema + "MEU") com templates `[CAMPOS]` |
+| `atendimento` | Anamnese, exame (focado/completo), módulos por queixa → `buildProntuario()`; seções **Exames laboratoriais**, **Prescrições emitidas** e **Faturas deste atendimento** (vinculadas via `atendVinculoId`) |
+| `prescricoes` | Catálogo (6 bases sistema + "MEU") com templates `[CAMPOS]`; editor com **📋 Emitir prescrição** (registra o documento final) |
 | `cobranca` | Geração de cobrança (PIX do perfil) + **faturas** (ver abaixo) |
 | `literatura` | Consulta RAG (`/literatura`, JWT) com citações `[Livro, p.X]` |
 
@@ -138,6 +138,14 @@ Pergunta (PT) → Cohere embed (search_query) → pgvector match_documents → c
 - `supabase/04_faturas.sql`: tabela `faturas(local_id, data_emissao, paciente_nome, itens JSONB, valor_total, status 'aberta'|'paga', pago_em, veterinario_id)` + RLS por vet.
 - Aba Cobrança: botão **"Gerar fatura"** (nasce `aberta`), lista com badge EM ABERTO/PAGA, botão **"Marcar paga"**, total em aberto.
 - Sync offline-first (localStorage `ev_faturas_v1` + Supabase); na reconciliação o status **"paga" prevalece**.
+- **Vínculo ao atendimento (jul/2026):** `09_fatura_atendimento.sql` adiciona `faturas.atendimento_local_id`. `gerarFatura` grava `atendLocalId = atendVinculoId || null`; card mostra badge "🔗 atendimento"; botão Gerar avisa se será vinculada ou avulsa; aba Atendimento lista "Faturas deste atendimento" (data, valor, status). Faturas antigas seguem avulsas (sem retroativo).
+
+### Prescrições emitidas — registro do documento final (jul/2026)
+- `supabase/08_prescricoes_emitidas.sql`: tabela `prescricoes_emitidas(local_id, atendimento_local_id NULL=avulsa, paciente_nome, proprietario_nome, diagnostico_titulo, texto, criado_em, veterinario_id)` + RLS por vet + índice único `(veterinario_id, local_id)`.
+- Editor de prescrição: botão **📋 Emitir prescrição** (`emitirPrescricao`) grava o texto como está (paciente/data/CRMV injetados) — localStorage `ev_presc_emitidas_v1` + insert Supabase; vinculada se houver `atendVinculoId`, senão avulsa.
+- Aba Atendimento: seção "Prescrições emitidas" do atendimento vinculado — expande texto completo (Courier), botão Copiar; reaparece ao recarregar o atendimento do Histórico.
+- Sync no login (padrão faturas): nuvem→local restaura de outro aparelho; local→nuvem reenvia pendentes offline. Sem update/delete na v1.
+- Distinção importante: "Salvar modelo" salva o TEMPLATE (des-injeta paciente/data); "Emitir" salva o DOCUMENTO final.
 
 ### Exames laboratoriais — integração com o EquiVet Lab (jul/2026)
 Na aba Atendimento, seção "Exames laboratoriais":
@@ -222,6 +230,18 @@ Campo de Treinos (`app_treinos.py`): 4 abas (Avaliação/Ensino/Similaridade CBI
 19. **CORS backend** — origens da família EquiVet hardcoded + OPTIONS (preflight dava 404, quebrava Literatura e Lab no navegador).
 20. **Limite de IA** — `06_limite_ia.sql` (premium + consumo_ia), `verificar_limite_ia`/`registrar_consumo_ia` nos 3 endpoints JWT, 429 nos frontends, Ricardo premium.
 21. **Integração Lab ↔ Clínica (exames)** — `07_exames.sql` (tabela `exames` vinculável/avulsa + RLS); portal card do Lab reativado; Clínica com botão "Abrir no EquiVet Lab" + seção de exames vinculados; Lab lê `?atend`, busca contexto, alimenta a IA e persiste o exame. **Validado E2E:** laudo citou o contexto do atendimento (exercício/claudicação) e o exame gravou vinculado.
+22. **Segurança GitHub resolvida (11/jul)** — token clássico `ghp_` que estava embutido nos remotes de 4 repos (`equivet`, `equivet-lab`, `equivet-chat-backend`, `equivet-radiografia`) revogado; URLs limpas (`https://github.com/...`); novo fine-grained token (`equivet-git`, escopo Contents R/W só nos repos do projeto) guardado no Keychain do macOS via `credential.helper osxkeychain` — push não pede mais senha. Varredura: nenhum outro segredo em código/histórico. Conta GitHub enxuta: `copa-2026` deletado; `equivet-uti` mantido e documentado (README) — reservado para futuro produto hospitalar standalone.
+23. **Prescrições emitidas** — `08_prescricoes_emitidas.sql` + botão Emitir no editor + seção na aba Atendimento + sync no login. SW v21.
+24. **Fatura ↔ atendimento** — `09_fatura_atendimento.sql` (coluna `atendimento_local_id`); vínculo no gerarFatura, badge 🔗, seção "Faturas deste atendimento". SW v22.
+
+---
+
+## Estratégia Comercial (decisões de jul/2026)
+
+- **Produto de assinatura = a suíte inteira (Clínica no centro); porta de entrada = Lab e Fármacos** (grátis, sem login, viralizam por WhatsApp). Funil: portal/conteúdo → Fármacos/Lab grátis → conta free (IA 3/48h) → limite → **Premium único** (não haverá duas assinaturas — o flag `premium` e o pool `consumo_ia` já são unificados).
+- **Preço-hipótese: R$ 97/mês** (ou R$ 970/ano). Racional: menos de meia consulta do vet equino; acima de "apezinho", abaixo de software de clínica multiusuário. Táticas: preço de fundador (R$ 67 vitalício, primeiros 30–50), trial de 14 dias do Premium completo. Considerar cota alta (100–150 consultas IA/mês) em vez de ilimitado, para proteger margem — infra de contagem já existe (`consumo_ia` + `LIMITE_IA_FREE` como modelo).
+- **EquiVet UTI = produto futuro separado** (assinatura institucional para hospitais, multiusuário). Repo `equivet-uti` reservado e documentado. Sequência acordada: NÃO codar agora; validar com 2–3 hospitais antes; quando construir, repo próprio sobre a mesma fundação (Supabase/Railway/auth). Enquanto isso, manter dados de internação separados do ambulatorial no schema do Clínica.
+- Tier futuro "Clínica/Haras" (multiusuário) quando surgirem clientes institucionais.
 
 ---
 
@@ -235,7 +255,8 @@ Campo de Treinos (`app_treinos.py`): 4 abas (Avaliação/Ensino/Similaridade CBI
 
 ### EquiVet Clínica ✅
 - [x] Atendimentos/prescrições/protocolos MEU (sync nuvem) / faturas (controle de recebimento) / literatura.
-- [ ] Pendente: confirmar citações `[Smith/Adams]` de forma consistente; registrar prescrições EMITIDAS (não só catálogo); vincular fatura ao atendimento de origem.
+- [x] **Prescrições emitidas** (registro do documento final, vinculado ou avulso) e **fatura vinculada ao atendimento** — migrações 08 e 09 rodadas, SW v22 publicado.
+- [ ] Pendente: confirmar citações `[Smith/Adams]` de forma consistente na aba Literatura.
 
 ### EquiVet Lab ✅ PUBLICADO
 - [x] `centaurovet.com.br/equivet-lab/`, sessão compartilhada, IA/PDF via backend, offline funcional.
@@ -243,8 +264,8 @@ Campo de Treinos (`app_treinos.py`): 4 abas (Avaliação/Ensino/Similaridade CBI
 - [ ] Pendente: empacotar como PWA (manifest + SW) para paridade com Clínica/Fármacos; estratificar faixas de referência por idade/estado fisiológico; histórico de exames por paciente (gráficos de evolução); reabrir um exame específico no Lab (`?exame=<id>` carregando valores+laudo).
 
 ### Pendências transversais
-- [ ] **SEGURANÇA:** revogar o token GitHub embutido nos remotes dos 3 repos (`equivet`, `equivet-lab`, `equivet-chat-backend`) e reapontar os remotes.
-- [ ] Cohere: confirmar/migrar Trial → Production key antes de escala comercial.
+- [x] **SEGURANÇA resolvida (11/jul):** token antigo revogado, remotes limpos nos 4 repos, fine-grained token no Keychain (ver correção #22).
+- [ ] Cohere: confirmar/migrar Trial → Production key antes de escala comercial (Trial: 1.000 chamadas/mês, uso comercial proibido). Ricardo decidiu adiar — manter no radar.
 - [ ] Latência do backend: avaliar container quente vs cold start.
 - [ ] Custo (estimativa): dominado pela Anthropic (~US$ 0,65–1,65/usuário ativo/mês). Alavancas: prompt caching (system + chunks −90% em cache), Haiku para perfis não-vet, cap por assinatura.
 
