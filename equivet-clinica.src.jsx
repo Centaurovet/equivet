@@ -682,7 +682,8 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
   const [upBusy,setUpBusy]   = useState(false);
   const [syncBusy,setSyncBusy]=useState(false);
   const [urls,setUrls]       = useState({});        // path -> signed url (miniaturas)
-  const [anexarImg,setAnexarImg] = useState(true);  // anexar imagens ao laudo impresso
+  const [anexarImg,setAnexarImg] = useState(true);  // anexar imagens ao PDF/impressao
+  const [pdfBusy,setPdfBusy]     = useState(false);
   const [confDelVC,setConfDelVC] = useState(null);  // id aguardando confirmacao de exclusao
   const fileRef = React.useRef(null);
 
@@ -855,6 +856,60 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
     setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} }, imgs.length?900:300);
   };
 
+  // Baixa a imagem do Storage como dataURL (embute no PDF sem depender de CORS/canvas)
+  const imagemDataUrl = async (path) => {
+    try{
+      const u = await urlAssinada(path);
+      if(!u) return null;
+      const resp = await fetch(u);
+      if(!resp.ok) return null;
+      const blob = await resp.blob();
+      return await new Promise(res=>{
+        const fr=new FileReader();
+        fr.onload=()=>res(fr.result); fr.onerror=()=>res(null);
+        fr.readAsDataURL(blob);
+      });
+    }catch(e){ return null; }
+  };
+
+  // Gera o PDF do laudo (A4) e baixa — pronto para enviar no WhatsApp.
+  const gerarPdf = async (laudo, comImagens) => {
+    if(typeof html2pdf==="undefined"){ avisar("Gerador de PDF nao carregou. Recarregue a pagina."); return; }
+    setPdfBusy(true);
+    try{
+      let imgs=[];
+      if(comImagens&&(laudo.radiografias||[]).length){
+        for(const r of laudo.radiografias){
+          const d=await imagemDataUrl(r.path);
+          if(d) imgs.push({...r,data:d});
+        }
+        if(imgs.length<(laudo.radiografias||[]).length)
+          avisar("Atencao: "+((laudo.radiografias||[]).length-imgs.length)+" imagem(ns) nao entraram no PDF.");
+      }
+      const texto = laudo.textoLaudo || buildLaudoVC(laudo, crmv);
+      const el=document.createElement("div");
+      el.style.cssText="position:fixed;left:-10000px;top:0;width:750px;background:#fff;color:#111;font-family:Georgia,serif";
+      el.innerHTML =
+        texto.split("\n\n").map(b=>'<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">'+escHtml(b)+'</div>').join("")
+        +(imgs.length
+          ? '<div style="font-size:14px;font-weight:700;border-top:1px solid #999;padding-top:14px;margin:20px 0 12px;page-break-inside:avoid">RADIOGRAFIAS ANEXADAS ('+imgs.length+')</div>'
+            +'<div>'+imgs.map((i,n)=>'<div style="display:inline-block;width:48%;margin:0 1% 14px;vertical-align:top;page-break-inside:avoid"><img src="'+i.data+'" style="width:100%;border:1px solid #bbb;display:block"/><div style="font-size:11px;color:#444;margin-top:4px;text-align:center">'+(n+1)+'. '+escHtml(i.projecao||"sem identificacao")+'</div></div>').join("")+'</div>'
+          : "");
+      document.body.appendChild(el);
+      const nome=((laudo.paciente||{}).nome||"animal").replace(/[^\wÀ-ɏ -]/g,"").trim().replace(/\s+/g,"_")||"animal";
+      const arq="Laudo_VetCheck_"+nome+"_"+(laudo.criadoEm||"").slice(0,10)+".pdf";
+      await html2pdf().set({
+        margin:[14,12,16,12], filename:arq,
+        image:{type:"jpeg",quality:0.92},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
+        jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+        pagebreak:{mode:["css","legacy"]},
+      }).from(el).save();
+      document.body.removeChild(el);
+    }catch(e){ avisar("Falha ao gerar o PDF: "+(e.message||e)); }
+    setPdfBusy(false);
+  };
+
   const emitir = async () => {
     if(!l) return;
     if(!(l.paciente.nome||"").trim()){ avisar("Informe o nome do animal."); return; }
@@ -863,7 +918,7 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
     const nx={...l, textoLaudo:texto, status:"emitido", emitidoEm:new Date().toISOString()};
     setL(nx);
     await persistir(nx);
-    imprimirLaudo(nx, anexarImg);
+    gerarPdf(nx, anexarImg);
   };
 
   const excluirVC = async (x) => {
@@ -958,17 +1013,21 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
 
       <label style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:C.muted,margin:"14px 0",cursor:"pointer"}}>
         <input type="checkbox" checked={anexarImg} onChange={e=>setAnexarImg(e.target.checked)} style={{accentColor:C.gold,width:16,height:16}}/>
-        Anexar as radiografias ao laudo impresso
+        Anexar as radiografias ao PDF
       </label>
 
       <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:6}}>
         <BtnVs onClick={salvarRascunho} style={{flex:1,minWidth:170,padding:"12px",color:C.gold,borderColor:C.gold,textAlign:"center"}}>
           {salvoVC?(salvoVC==="nuvem"?"✓ Salvo (local + nuvem)":"✓ Salvo (so local — sem conexao)"):"💾 Salvar rascunho"}
         </BtnVs>
-        <BtnVc onClick={emitir} style={{flex:1,minWidth:170,padding:"12px"}}>
-          {emitido?"🖨 Re-emitir e imprimir":"📋 Emitir laudo e imprimir"}
+        <BtnVc onClick={emitir} disabled={pdfBusy} style={{flex:1,minWidth:170,padding:"12px"}}>
+          {pdfBusy?"⏳ Gerando PDF…":(emitido?"📄 Re-emitir (baixa PDF)":"📋 Emitir laudo (baixa PDF)")}
         </BtnVc>
-        {emitido&&<BtnVs onClick={()=>imprimirLaudo(l,anexarImg)} style={{padding:"12px"}}>🖨 Imprimir novamente</BtnVs>}
+        {emitido&&<BtnVs onClick={()=>gerarPdf(l,anexarImg)} style={{padding:"12px"}}>📄 Baixar PDF</BtnVs>}
+        {emitido&&<BtnVs onClick={()=>imprimirLaudo(l,anexarImg)} style={{padding:"12px"}}>🖨 Imprimir</BtnVs>}
+      </div>
+      <div style={{fontSize:11,color:C.dim,marginTop:8,lineHeight:1.5}}>
+        O PDF e baixado no aparelho (pasta Downloads) — dai e so anexar no WhatsApp do cliente.
       </div>
       {emitido&&l.textoLaudo&&<details style={{marginTop:14}}>
         <summary style={{color:C.gold,fontSize:12,cursor:"pointer"}}>Ver texto emitido</summary>
