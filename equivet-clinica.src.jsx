@@ -887,17 +887,22 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
           avisar("Atencao: "+((laudo.radiografias||[]).length-imgs.length)+" imagem(ns) nao entraram no PDF.");
       }
       const texto = laudo.textoLaudo || buildLaudoVC(laudo, crmv);
+      // O html2pdf CLONA o elemento para dentro de um container proprio e usa a altura
+      // dele para dimensionar o canvas. Elemento com position:fixed/absolute nao gera
+      // altura no container -> canvas Nx0 -> PDF em branco. Por isso o el capturado fica
+      // SEM position (estatico) e quem o esconde da pagina e o wrapper (nao clonado).
+      const wrap=document.createElement("div");
+      wrap.style.cssText="position:fixed;left:-10000px;top:0;width:750px;overflow:hidden";
       const el=document.createElement("div");
-      // position:absolute em 0,0 atras do app (z-index negativo) — html2canvas ignora
-      // conteudo position:fixed fora do viewport, o que gerava PDF em branco.
-      el.style.cssText="position:absolute;left:0;top:0;width:750px;background:#fff;color:#111;font-family:Georgia,serif;z-index:-9999";
+      el.style.cssText="width:750px;background:#fff;color:#111;font-family:Georgia,serif";
       el.innerHTML =
         texto.split("\n\n").map(b=>'<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">'+escHtml(b)+'</div>').join("")
         +(imgs.length
           ? '<div style="font-size:14px;font-weight:700;border-top:1px solid #999;padding-top:14px;margin:20px 0 12px;page-break-inside:avoid">RADIOGRAFIAS ANEXADAS ('+imgs.length+')</div>'
             +'<div>'+imgs.map((i,n)=>'<div style="display:inline-block;width:48%;margin:0 1% 14px;vertical-align:top;page-break-inside:avoid"><img src="'+i.data+'" style="width:100%;border:1px solid #bbb;display:block"/><div style="font-size:11px;color:#444;margin-top:4px;text-align:center">'+(n+1)+'. '+escHtml(i.projecao||"sem identificacao")+'</div></div>').join("")+'</div>'
           : "");
-      document.body.appendChild(el);
+      wrap.appendChild(el);
+      document.body.appendChild(wrap);
       const nome=((laudo.paciente||{}).nome||"animal").replace(/[^\wÀ-ɏ -]/g,"").trim().replace(/\s+/g,"_")||"animal";
       const arq="Laudo_VetCheck_"+nome+"_"+(laudo.criadoEm||"").slice(0,10)+".pdf";
       await html2pdf().set({
@@ -907,7 +912,7 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
         jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
         pagebreak:{mode:["css","legacy"]},
       }).from(el).save();
-      document.body.removeChild(el);
+      document.body.removeChild(wrap);
     }catch(e){ avisar("Falha ao gerar o PDF: "+(e.message||e)); }
     setPdfBusy(false);
   };
