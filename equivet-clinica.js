@@ -1728,6 +1728,7 @@ function VetCheckTab({
       el.innerHTML = texto.split("\n\n").map(b => '<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">' + escHtml(b) + '</div>').join("") + (imgs.length ? '<div style="font-size:14px;font-weight:700;border-top:1px solid #999;padding-top:14px;margin:20px 0 12px;page-break-inside:avoid">RADIOGRAFIAS ANEXADAS (' + imgs.length + ')</div>' + '<div>' + imgs.map((i, n) => '<div style="display:inline-block;width:48%;margin:0 1% 14px;vertical-align:top;page-break-inside:avoid"><img src="' + i.data + '" style="width:100%;border:1px solid #bbb;display:block"/><div style="font-size:11px;color:#444;margin-top:4px;text-align:center">' + (n + 1) + '. ' + escHtml(i.projecao || "sem identificacao") + '</div></div>').join("") + '</div>' : "");
       wrap.appendChild(el);
       document.body.appendChild(wrap);
+      await Promise.all(Array.from(el.querySelectorAll("img")).map(i => (i.decode ? i.decode() : Promise.resolve()).catch(() => {})));
       const nome = ((laudo.paciente || {}).nome || "animal").replace(/[^\wÀ-ɏ -]/g, "").trim().replace(/\s+/g, "_") || "animal";
       const arq = "Laudo_VetCheck_" + nome + "_" + (laudo.criadoEm || "").slice(0, 10) + ".pdf";
       await html2pdf().set({

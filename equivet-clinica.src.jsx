@@ -903,6 +903,11 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
           : "");
       wrap.appendChild(el);
       document.body.appendChild(wrap);
+      // Espera TODAS as imagens decodificarem antes de medir/capturar — sem isso o
+      // html2pdf mede a altura com <img> ainda sem dimensao e corta radiografias.
+      await Promise.all(Array.from(el.querySelectorAll("img")).map(i=>
+        (i.decode?i.decode():Promise.resolve()).catch(()=>{})
+      ));
       const nome=((laudo.paciente||{}).nome||"animal").replace(/[^\wÀ-ɏ -]/g,"").trim().replace(/\s+/g,"_")||"animal";
       const arq="Laudo_VetCheck_"+nome+"_"+(laudo.criadoEm||"").slice(0,10)+".pdf";
       await html2pdf().set({
