@@ -904,31 +904,51 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
       wrap.style.cssText="position:fixed;left:-10000px;top:0;width:750px;overflow:hidden";
       const el=document.createElement("div");
       el.style.cssText="width:750px;background:#fff;color:#111;font-family:Georgia,serif";
+      // So o TEXTO passa pelo html2canvas. As radiografias sao adicionadas DIRETO no
+      // jsPDF (pdf.addImage) — canvas gigante com muitas imagens trunca/estoura memoria.
       el.innerHTML =
-        texto.split("\n\n").map(b=>'<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">'+escHtml(b)+'</div>').join("")
-        +(imgs.length
-          ? '<div style="font-size:14px;font-weight:700;border-top:1px solid #999;padding-top:14px;margin:20px 0 12px;page-break-inside:avoid">RADIOGRAFIAS ANEXADAS ('+imgs.length+')</div>'
-            +'<div>'+imgs.map((i,n)=>{
-              const iw=360, ih=i.w?Math.round(iw*i.h/i.w):270;
-              return '<div style="display:inline-block;width:'+iw+'px;margin:0 4px 14px;vertical-align:top;page-break-inside:avoid"><img src="'+i.data+'" width="'+iw+'" height="'+ih+'" style="width:'+iw+'px;height:'+ih+'px;border:1px solid #bbb;display:block"/><div style="font-size:11px;color:#444;margin-top:4px;text-align:center">'+(n+1)+'. '+escHtml(i.projecao||"sem identificacao")+'</div></div>';
-            }).join("")+'</div>'
-          : "");
+        texto.split("\n\n").map(b=>'<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">'+escHtml(b)+'</div>').join("");
       wrap.appendChild(el);
       document.body.appendChild(wrap);
-      // Espera TODAS as imagens decodificarem antes de medir/capturar — sem isso o
-      // html2pdf mede a altura com <img> ainda sem dimensao e corta radiografias.
-      await Promise.all(Array.from(el.querySelectorAll("img")).map(i=>
-        (i.decode?i.decode():Promise.resolve()).catch(()=>{})
-      ));
       const nome=((laudo.paciente||{}).nome||"animal").replace(/[^\wÀ-ɏ -]/g,"").trim().replace(/\s+/g,"_")||"animal";
       const arq="Laudo_VetCheck_"+nome+"_"+(laudo.criadoEm||"").slice(0,10)+".pdf";
-      await html2pdf().set({
+      let worker = html2pdf().set({
         margin:[14,12,16,12], filename:arq,
         image:{type:"jpeg",quality:0.92},
         html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff",scrollX:0,scrollY:0},
         jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
         pagebreak:{mode:["css","legacy"]},
-      }).from(el).save();
+      }).from(el).toPdf();
+      if(imgs.length){
+        worker = worker.get("pdf").then(pdf=>{
+          const PH=297, ML=12, MT=14, MB=16, GAP=6;
+          const colW=(210-ML*2-GAP)/2; // 2 colunas de 90mm
+          pdf.addPage();
+          let y=MT;
+          pdf.setFont("times","bold"); pdf.setFontSize(12);
+          pdf.text("RADIOGRAFIAS ANEXADAS ("+imgs.length+")", ML, y+4);
+          y+=12;
+          pdf.setFont("times","normal"); pdf.setFontSize(9);
+          let col=0, rowMax=0;
+          for(let n=0;n<imgs.length;n++){
+            const i=imgs[n];
+            const w=colW, h=i.w?(w*i.h/i.w):(w*0.75), blockH=h+9;
+            const cap=(n+1)+". "+(i.projecao||"sem identificacao");
+            if(col===0){
+              if(y+blockH>PH-MB){ pdf.addPage(); y=MT; }
+              pdf.addImage(i.data,"JPEG",ML,y,w,h);
+              pdf.text(cap, ML+w/2, y+h+4, {align:"center",maxWidth:w});
+              rowMax=blockH; col=1;
+            }else{
+              if(y+blockH>PH-MB){ y+=rowMax; col=0; rowMax=0; n--; continue; }
+              pdf.addImage(i.data,"JPEG",ML+colW+GAP,y,w,h);
+              pdf.text(cap, ML+colW+GAP+w/2, y+h+4, {align:"center",maxWidth:w});
+              y+=Math.max(rowMax,blockH); col=0; rowMax=0;
+            }
+          }
+        });
+      }
+      await worker.save();
       document.body.removeChild(wrap);
     }catch(e){ avisar("Falha ao gerar o PDF: "+(e.message||e)); }
     setPdfBusy(false);
