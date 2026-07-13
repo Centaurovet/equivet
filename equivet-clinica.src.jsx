@@ -881,7 +881,16 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
       if(comImagens&&(laudo.radiografias||[]).length){
         for(const r of laudo.radiografias){
           const d=await imagemDataUrl(r.path);
-          if(d) imgs.push({...r,data:d});
+          if(!d) continue;
+          // Mede a dimensao real ANTES de montar o HTML — com width/height explicitos
+          // no <img> o layout nao depende do decode e nenhuma radiografia e cortada.
+          const dim=await new Promise(res=>{
+            const im=new Image();
+            im.onload=()=>res({w:im.naturalWidth,h:im.naturalHeight});
+            im.onerror=()=>res(null);
+            im.src=d;
+          });
+          imgs.push({...r,data:d,w:(dim||{}).w||0,h:(dim||{}).h||0});
         }
         if(imgs.length<(laudo.radiografias||[]).length)
           avisar("Atencao: "+((laudo.radiografias||[]).length-imgs.length)+" imagem(ns) nao entraram no PDF.");
@@ -899,7 +908,10 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
         texto.split("\n\n").map(b=>'<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">'+escHtml(b)+'</div>').join("")
         +(imgs.length
           ? '<div style="font-size:14px;font-weight:700;border-top:1px solid #999;padding-top:14px;margin:20px 0 12px;page-break-inside:avoid">RADIOGRAFIAS ANEXADAS ('+imgs.length+')</div>'
-            +'<div>'+imgs.map((i,n)=>'<div style="display:inline-block;width:48%;margin:0 1% 14px;vertical-align:top;page-break-inside:avoid"><img src="'+i.data+'" style="width:100%;border:1px solid #bbb;display:block"/><div style="font-size:11px;color:#444;margin-top:4px;text-align:center">'+(n+1)+'. '+escHtml(i.projecao||"sem identificacao")+'</div></div>').join("")+'</div>'
+            +'<div>'+imgs.map((i,n)=>{
+              const iw=360, ih=i.w?Math.round(iw*i.h/i.w):270;
+              return '<div style="display:inline-block;width:'+iw+'px;margin:0 4px 14px;vertical-align:top;page-break-inside:avoid"><img src="'+i.data+'" width="'+iw+'" height="'+ih+'" style="width:'+iw+'px;height:'+ih+'px;border:1px solid #bbb;display:block"/><div style="font-size:11px;color:#444;margin-top:4px;text-align:center">'+(n+1)+'. '+escHtml(i.projecao||"sem identificacao")+'</div></div>';
+            }).join("")+'</div>'
           : "");
       wrap.appendChild(el);
       document.body.appendChild(wrap);
