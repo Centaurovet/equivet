@@ -1722,7 +1722,7 @@ function VetCheckTab({
       }
       const texto = laudo.textoLaudo || buildLaudoVC(laudo, crmv);
       const el = document.createElement("div");
-      el.style.cssText = "position:fixed;left:-10000px;top:0;width:750px;background:#fff;color:#111;font-family:Georgia,serif";
+      el.style.cssText = "position:absolute;left:0;top:0;width:750px;background:#fff;color:#111;font-family:Georgia,serif;z-index:-9999";
       el.innerHTML = texto.split("\n\n").map(b => '<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">' + escHtml(b) + '</div>').join("") + (imgs.length ? '<div style="font-size:14px;font-weight:700;border-top:1px solid #999;padding-top:14px;margin:20px 0 12px;page-break-inside:avoid">RADIOGRAFIAS ANEXADAS (' + imgs.length + ')</div>' + '<div>' + imgs.map((i, n) => '<div style="display:inline-block;width:48%;margin:0 1% 14px;vertical-align:top;page-break-inside:avoid"><img src="' + i.data + '" style="width:100%;border:1px solid #bbb;display:block"/><div style="font-size:11px;color:#444;margin-top:4px;text-align:center">' + (n + 1) + '. ' + escHtml(i.projecao || "sem identificacao") + '</div></div>').join("") + '</div>' : "");
       document.body.appendChild(el);
       const nome = ((laudo.paciente || {}).nome || "animal").replace(/[^\wÀ-ɏ -]/g, "").trim().replace(/\s+/g, "_") || "animal";
@@ -1737,7 +1737,9 @@ function VetCheckTab({
         html2canvas: {
           scale: 2,
           useCORS: true,
-          backgroundColor: "#ffffff"
+          backgroundColor: "#ffffff",
+          scrollX: 0,
+          scrollY: 0
         },
         jsPDF: {
           unit: "mm",

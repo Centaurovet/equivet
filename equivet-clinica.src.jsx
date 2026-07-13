@@ -888,7 +888,9 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
       }
       const texto = laudo.textoLaudo || buildLaudoVC(laudo, crmv);
       const el=document.createElement("div");
-      el.style.cssText="position:fixed;left:-10000px;top:0;width:750px;background:#fff;color:#111;font-family:Georgia,serif";
+      // position:absolute em 0,0 atras do app (z-index negativo) — html2canvas ignora
+      // conteudo position:fixed fora do viewport, o que gerava PDF em branco.
+      el.style.cssText="position:absolute;left:0;top:0;width:750px;background:#fff;color:#111;font-family:Georgia,serif;z-index:-9999";
       el.innerHTML =
         texto.split("\n\n").map(b=>'<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">'+escHtml(b)+'</div>').join("")
         +(imgs.length
@@ -901,7 +903,7 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
       await html2pdf().set({
         margin:[14,12,16,12], filename:arq,
         image:{type:"jpeg",quality:0.92},
-        html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
+        html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff",scrollX:0,scrollY:0},
         jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
         pagebreak:{mode:["css","legacy"]},
       }).from(el).save();
