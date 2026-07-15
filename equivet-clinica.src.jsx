@@ -953,10 +953,13 @@ function VetCheckTab({ user, pacienteHeader, crmv, atendVinculoId, avisar }){
       // dele para dimensionar o canvas. Elemento com position:fixed/absolute nao gera
       // altura no container -> canvas Nx0 -> PDF em branco. Por isso o el capturado fica
       // SEM position (estatico) e quem o esconde da pagina e o wrapper (nao clonado).
+      // Largura DEVE casar com o container interno do html2pdf: (210-12-12)mm a 96dpi
+      // = ~703px. Mais largo que isso, o clone reflui a 703 e corta a direita.
+      const LARG=Math.floor((210-12-12)/25.4*96); // 703px
       const wrap=document.createElement("div");
-      wrap.style.cssText="position:fixed;left:-10000px;top:0;width:750px;overflow:hidden";
+      wrap.style.cssText="position:fixed;left:-10000px;top:0;width:"+LARG+"px;overflow:hidden";
       const el=document.createElement("div");
-      el.style.cssText="width:750px;background:#fff;color:#111;font-family:Georgia,serif";
+      el.style.cssText="width:"+LARG+"px;background:#fff;color:#111;font-family:Georgia,serif";
       // So o TEXTO passa pelo html2canvas. As radiografias sao adicionadas DIRETO no
       // jsPDF (pdf.addImage) — canvas gigante com muitas imagens trunca/estoura memoria.
       el.innerHTML = buildLaudoHtmlVC(laudo, crmv);
