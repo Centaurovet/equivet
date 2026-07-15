@@ -1757,13 +1757,14 @@ function VetCheckTab({
       // dele para dimensionar o canvas. Elemento com position:fixed/absolute nao gera
       // altura no container -> canvas Nx0 -> PDF em branco. Por isso o el capturado fica
       // SEM position (estatico) e quem o esconde da pagina e o wrapper (nao clonado).
-      // Largura DEVE casar com o container interno do html2pdf: (210-12-12)mm a 96dpi
-      // = ~703px. Mais largo que isso, o clone reflui a 703 e corta a direita.
-      const LARG = Math.floor((210 - 12 - 12) / 25.4 * 96); // 703px
+      // Anti-corte a direita: margem horizontal do html2pdf = 0 (container interno
+      // = pagina inteira, 210mm) e as margens laterais viram PADDING em mm dentro
+      // do proprio el. Se o clone refluir com largura diferente, o corte come o
+      // padding — nunca o texto. Largura em mm para casar 1:1 com o container.
       const wrap = document.createElement("div");
-      wrap.style.cssText = "position:fixed;left:-10000px;top:0;width:" + LARG + "px;overflow:hidden";
+      wrap.style.cssText = "position:fixed;left:-10000px;top:0;width:210mm;overflow:hidden";
       const el = document.createElement("div");
-      el.style.cssText = "width:" + LARG + "px;background:#fff;color:#111;font-family:Georgia,serif";
+      el.style.cssText = "width:210mm;box-sizing:border-box;padding:0 12mm;background:#fff;color:#111;font-family:Georgia,serif";
       // So o TEXTO passa pelo html2canvas. As radiografias sao adicionadas DIRETO no
       // jsPDF (pdf.addImage) — canvas gigante com muitas imagens trunca/estoura memoria.
       el.innerHTML = buildLaudoHtmlVC(laudo, crmv);
@@ -1772,7 +1773,7 @@ function VetCheckTab({
       const nome = ((laudo.paciente || {}).nome || "animal").replace(/[^\wÀ-ɏ -]/g, "").trim().replace(/\s+/g, "_") || "animal";
       const arq = "Laudo_VetCheck_" + nome + "_" + (laudo.criadoEm || "").slice(0, 10) + ".pdf";
       let worker = html2pdf().set({
-        margin: [14, 12, 16, 12],
+        margin: [14, 0, 16, 0],
         filename: arq,
         image: {
           type: "jpeg",
