@@ -1342,6 +1342,25 @@ function buildLaudoVC(l, crmv) {
   o.push("Dr. Ricardo | CRMV-" + (crmv || "[UF] [No]"));
   return o.join("\n");
 }
+
+// Versao diagramada do laudo para o PDF (variacao "classico editorial"):
+// cabecalho Centaurovet com filete dourado, secoes com titulo dourado,
+// parecer em caixa e assinatura centralizada. Renderizada a partir dos
+// campos estruturados (o texto_laudo congelado segue sendo o registro).
+function buildLaudoHtmlVC(l, crmv) {
+  const p = l.paciente || {},
+    pt = l.partes || {},
+    ex = l.exame || {};
+  const G = "#a8813f",
+    R = "#d4a96a",
+    E = escHtml;
+  const dataExame = (l.criadoEm || "").slice(0, 10).split("-").reverse().join("/");
+  const linha = (rot, val) => val ? '<div><span style="color:#777">' + rot + ':</span> ' + E(val) + '</div>' : "";
+  const secoes = VC_ETAPAS.filter(([k]) => ex[k] && ex[k].trim()).map(([k, titulo]) => '<div style="margin-top:18px;page-break-inside:avoid">' + '<div style="font-size:14px;color:' + G + '">' + E(titulo) + '</div>' + '<div style="white-space:pre-wrap;font-size:13px;line-height:1.65;color:#333;margin-top:4px">' + E(ex[k].trim()) + '</div>' + '</div>').join("");
+  const rads = l.radiografias || [];
+  const radsHtml = rads.length ? '<div style="margin-top:18px;page-break-inside:avoid">' + '<div style="font-size:11px;letter-spacing:2px;color:' + G + '">RADIOGRAFIAS ANEXADAS — ' + rads.length + ' IMAGEM(NS)</div>' + '<div style="font-size:12.5px;line-height:1.6;color:#333;margin-top:4px">' + rads.map((r, i) => i + 1 + ". " + E(r.projecao || "sem identificacao")).join("<br>") + '</div><div style="font-size:11.5px;color:#777;font-style:italic;margin-top:4px">As imagens anexas integram este laudo como documentacao, sem interpretacao adicional alem da descrita acima.</div>' + '</div>' : "";
+  return '<div style="text-align:center">' + '<div style="font-size:15px;letter-spacing:8px;color:' + G + '">CENTAUROVET</div>' + '<div style="height:2px;background:' + R + ';margin:10px 90px 0"></div>' + '<div style="font-size:23px;margin-top:16px;color:#111">Laudo de Exame de Compra</div>' + '<div style="font-size:12.5px;color:#777;font-style:italic;margin-top:4px">Protocolo AAEP · exame de animal para compra (VetCheck)</div>' + '</div>' + '<table style="width:100%;margin-top:24px;border-collapse:collapse"><tr>' + '<td style="vertical-align:top;width:50%;border-top:2px solid ' + R + ';padding:8px 14px 0 0">' + '<div style="font-size:11px;letter-spacing:2px;color:' + G + '">PACIENTE</div>' + '<div style="font-size:13px;line-height:1.7;color:#222;margin-top:4px">' + linha("Nome", p.nome) + linha("Idade", p.idade) + linha("Sexo", p.sexo) + linha("Pelagem", p.pelagem) + linha("Registro/Microchip", p.registro) + '</div></td>' + '<td style="vertical-align:top;border-top:2px solid ' + R + ';padding:8px 0 0 14px">' + '<div style="font-size:11px;letter-spacing:2px;color:' + G + '">PARTES E EXAME</div>' + '<div style="font-size:13px;line-height:1.7;color:#222;margin-top:4px">' + linha("Comprador", pt.comprador) + linha("Vendedor", pt.vendedor) + linha("Finalidade", pt.finalidade) + linha("Local do exame", pt.local) + linha("Data do exame", dataExame) + '</div></td>' + '</tr></table>' + secoes + radsHtml + '<div style="margin-top:22px;border:2px solid ' + R + ';background:#fdf9f2;padding:14px 16px;page-break-inside:avoid">' + '<div style="font-size:11px;letter-spacing:2px;color:' + G + '">CONCLUSAO / PARECER</div>' + '<div style="white-space:pre-wrap;font-size:13px;line-height:1.65;color:#222;margin-top:5px">' + E((l.conclusao || "").trim() || "-") + '</div>' + '</div>' + '<div style="font-size:11.5px;color:#777;font-style:italic;margin-top:14px">Este laudo reflete as condicoes do animal identificadas no momento do exame e nao constitui garantia de higidez futura ou de desempenho.</div>' + '<div style="margin-top:40px;text-align:center;page-break-inside:avoid">' + '<div style="border-top:1px solid #888;width:55%;margin:0 auto;padding-top:7px;font-size:13px;color:#222">Dr. Ricardo · CRMV-' + E(crmv || "[UF] [No]") + '</div>' + '<div style="font-size:11px;color:#888;margin-top:3px">Emitido em ' + E(l.emitidoEm ? new Date(l.emitidoEm).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")) + '</div>' + '</div>';
+}
 function VetCheckTab({
   user,
   pacienteHeader,
@@ -1714,6 +1733,8 @@ function VetCheckTab({
         for (const r of laudo.radiografias) {
           const d = await imagemDataUrl(r.path);
           if (!d) continue;
+          // Mede a dimensao real ANTES de montar o HTML — com width/height explicitos
+          // no <img> o layout nao depende do decode e nenhuma radiografia e cortada.
           const dim = await new Promise(res => {
             const im = new Image();
             im.onload = () => res({
@@ -1732,12 +1753,17 @@ function VetCheckTab({
         }
         if (imgs.length < (laudo.radiografias || []).length) avisar("Atencao: " + ((laudo.radiografias || []).length - imgs.length) + " imagem(ns) nao entraram no PDF.");
       }
-      const texto = laudo.textoLaudo || buildLaudoVC(laudo, crmv);
+      // O html2pdf CLONA o elemento para dentro de um container proprio e usa a altura
+      // dele para dimensionar o canvas. Elemento com position:fixed/absolute nao gera
+      // altura no container -> canvas Nx0 -> PDF em branco. Por isso o el capturado fica
+      // SEM position (estatico) e quem o esconde da pagina e o wrapper (nao clonado).
       const wrap = document.createElement("div");
       wrap.style.cssText = "position:fixed;left:-10000px;top:0;width:750px;overflow:hidden";
       const el = document.createElement("div");
       el.style.cssText = "width:750px;background:#fff;color:#111;font-family:Georgia,serif";
-      el.innerHTML = texto.split("\n\n").map(b => '<div style="white-space:pre-wrap;font-size:13px;line-height:1.6;margin:0 0 13px;page-break-inside:avoid">' + escHtml(b) + '</div>').join("");
+      // So o TEXTO passa pelo html2canvas. As radiografias sao adicionadas DIRETO no
+      // jsPDF (pdf.addImage) — canvas gigante com muitas imagens trunca/estoura memoria.
+      el.innerHTML = buildLaudoHtmlVC(laudo, crmv);
       wrap.appendChild(el);
       document.body.appendChild(wrap);
       const nome = ((laudo.paciente || {}).nome || "animal").replace(/[^\wÀ-ɏ -]/g, "").trim().replace(/\s+/g, "_") || "animal";
@@ -1765,37 +1791,82 @@ function VetCheckTab({
           mode: ["css", "legacy"]
         }
       }).from(el).toPdf();
-      if (imgs.length) {
-        worker = worker.get("pdf").then(pdf => {
-          const PH = 297, ML = 12, MT = 14, MB = 16, GAP = 6;
-          const colW = (210 - ML * 2 - GAP) / 2;
+      worker = worker.get("pdf").then(pdf => {
+        const PH = 297,
+          ML = 12,
+          MT = 14,
+          MB = 16,
+          GAP = 6;
+        if (imgs.length) {
+          const colW = (210 - ML * 2 - GAP) / 2; // 2 colunas de 90mm
           pdf.addPage();
           let y = MT;
-          pdf.setFont("times", "bold");
-          pdf.setFontSize(12);
-          pdf.text("RADIOGRAFIAS ANEXADAS (" + imgs.length + ")", ML, y + 4);
-          y += 12;
           pdf.setFont("times", "normal");
+          pdf.setFontSize(11);
+          pdf.setTextColor(168, 129, 63); // dourado do laudo
+          pdf.text("RADIOGRAFIAS ANEXADAS (" + imgs.length + ")", ML, y + 4);
+          pdf.setDrawColor(212, 169, 106);
+          pdf.setLineWidth(0.5);
+          pdf.line(ML, y + 7, 210 - ML, y + 7);
+          y += 14;
           pdf.setFontSize(9);
-          let col = 0, rowMax = 0;
+          pdf.setTextColor(80);
+          let col = 0,
+            rowMax = 0;
           for (let n = 0; n < imgs.length; n++) {
             const i = imgs[n];
-            const w = colW, h = i.w ? w * i.h / i.w : w * 0.75, blockH = h + 9;
-            const cap = (n + 1) + ". " + (i.projecao || "sem identificacao");
+            const w = colW,
+              h = i.w ? w * i.h / i.w : w * 0.75,
+              blockH = h + 9;
+            const cap = n + 1 + ". " + (i.projecao || "sem identificacao");
             if (col === 0) {
-              if (y + blockH > PH - MB) { pdf.addPage(); y = MT; }
+              if (y + blockH > PH - MB) {
+                pdf.addPage();
+                y = MT;
+              }
               pdf.addImage(i.data, "JPEG", ML, y, w, h);
-              pdf.text(cap, ML + w / 2, y + h + 4, { align: "center", maxWidth: w });
-              rowMax = blockH; col = 1;
+              pdf.text(cap, ML + w / 2, y + h + 4, {
+                align: "center",
+                maxWidth: w
+              });
+              rowMax = blockH;
+              col = 1;
             } else {
-              if (y + blockH > PH - MB) { y += rowMax; col = 0; rowMax = 0; n--; continue; }
+              if (y + blockH > PH - MB) {
+                y += rowMax;
+                col = 0;
+                rowMax = 0;
+                n--;
+                continue;
+              }
               pdf.addImage(i.data, "JPEG", ML + colW + GAP, y, w, h);
-              pdf.text(cap, ML + colW + GAP + w / 2, y + h + 4, { align: "center", maxWidth: w });
-              y += Math.max(rowMax, blockH); col = 0; rowMax = 0;
+              pdf.text(cap, ML + colW + GAP + w / 2, y + h + 4, {
+                align: "center",
+                maxWidth: w
+              });
+              y += Math.max(rowMax, blockH);
+              col = 0;
+              rowMax = 0;
             }
           }
-        });
-      }
+        }
+        // Rodape em todas as paginas: filete dourado + site + paginacao
+        const total = pdf.internal.getNumberOfPages();
+        for (let pg = 1; pg <= total; pg++) {
+          pdf.setPage(pg);
+          pdf.setDrawColor(212, 169, 106);
+          pdf.setLineWidth(0.3);
+          pdf.line(ML, 288, 210 - ML, 288);
+          pdf.setFont("times", "normal");
+          pdf.setFontSize(8);
+          pdf.setTextColor(150);
+          pdf.text("centaurovet.com.br", ML, 292);
+          pdf.text("pagina " + pg + " de " + total, 210 - ML, 292, {
+            align: "right"
+          });
+        }
+        pdf.setTextColor(0);
+      });
       await worker.save();
       document.body.removeChild(wrap);
     } catch (e) {
